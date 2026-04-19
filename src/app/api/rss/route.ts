@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
 import Parser from 'rss-parser';
-import * as cheerio from 'cheerio';
 
 type CustomFeed = { title: string };
 type CustomItem = { description: string, pubDate: string, contentSnippet?: string, content?: string };
 
 const parser = new Parser<CustomFeed, CustomItem>();
 
+// 공식 공인 기관 RSS 실시간 수집
 const RSS_SOURCES = [
   {
     name: '대한민국 정책브리핑',
@@ -16,48 +16,11 @@ const RSS_SOURCES = [
   {
     name: '중소벤처기업부',
     url: 'https://mss.go.kr/rss/smba/board/85.do',
-    category: '사업공고',
-    fallbackUrl: 'https://mss.go.kr/site/smba/ex/board/List.do?cbIdx=86'
+    category: '보도자료'
   }
 ];
 
 export const dynamic = 'force-dynamic';
-
-async function fetchMssFallback(): Promise<any[]> {
-    try {
-        const res = await fetch('https://mss.go.kr/site/smba/ex/board/List.do?cbIdx=86', {
-            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' },
-            signal: AbortSignal.timeout(5000)
-        });
-        const html = await res.text();
-        const $ = cheerio.load(html);
-        const items: any[] = [];
-        
-        $('.table_style01 tbody tr').each((i, el) => {
-            if (i >= 20) return; // 상위 20개만 수집
-            const title = $(el).find('.txt_left a').text().trim();
-            const link = $(el).find('.txt_left a').attr('href');
-            const date = $(el).find('td').eq(4).text().trim();
-            
-            if (title) {
-                items.push({
-                    id: `mss-crawl-${title}`,
-                    ministry: '중소벤처기업부',
-                    category: '사업공고',
-                    title,
-                    link: link ? `https://mss.go.kr${link}` : 'https://mss.go.kr',
-                    date: date || new Date().toISOString(),
-                    description: '중소벤처기업부 최신 보도자료 및 공고입니다.',
-                    source: '중소벤처기업부',
-                    isLocal: false
-                });
-            }
-        });
-        return items;
-    } catch (e) {
-        return [];
-    }
-}
 
 export async function GET() {
   try {
@@ -65,23 +28,17 @@ export async function GET() {
       try {
         const res = await fetch(source.url, {
           next: { revalidate: 0 },
-          signal: AbortSignal.timeout(10000), // 10초 타임아웃
           headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
           }
         });
 
         if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
         const xml = await res.text();
-        if (xml.length < 500 && source.name === '중소벤처기업부') {
-            return await fetchMssFallback();
-        }
-
         const feed = await parser.parseString(xml);
         
-        // 소스별 최대 30개로 제한하여 쏠림 방지
-        return feed.items.slice(0, 30).map(item => {
-          let ministry = source.name === '중소벤처기업부' ? '중소벤처기업부' : '기타 부처';
+        return feed.items.map(item => {
+          let ministry = source.name === '중소벤처기업부' ? '중소벤처기업부' : '부처 공통';
           let title = item.title || '';
           
           if (source.name === '대한민국 정책브리핑') {
@@ -98,13 +55,11 @@ export async function GET() {
             }
           }
 
-          let category = source.category;
-          if (source.name === '대한민국 정책브리핑') {
-            if (['기획재정부', '국토교통부', '금융위원회', '공정거래위원회'].includes(ministry)) {
-              category = '경제/부동산';
-            } else if (['보건복지부', '행정안전부', '고용노동부', '여성가족부'].includes(ministry)) {
-              category = '생활/복지';
-            }
+          let category = '기타 부처';
+          if (['기획재정부', '국토교통부', '금융위원회', '공정거래위원회'].some(m => ministry.includes(m))) {
+            category = '경제/부동산';
+          } else if (['보건복지부', '행정안전부', '고용노동부', '여성가족부'].some(m => ministry.includes(m))) {
+            category = '생활/복지';
           }
           
           let content = (item.contentSnippet || item.content || item.description || '').trim();
@@ -117,13 +72,12 @@ export async function GET() {
             title,
             link: item.link,
             date: item.pubDate,
-            description: content || `${ministry}의 최신 소식입니다.`,
-            source: source.name,
-            isLocal: title.includes('화성') || title.includes('경기') || content.includes('화성시') || content.includes('경기도')
+            description: content || `${ministry}의 최신 공식 보도자료입니다.`,
+            source: '공식 보도자료',
+            isLocal: title.includes('화성') || title.includes('경기')
           };
         });
-      } catch (e: any) {
-        if (source.name === '중소벤처기업부') return await fetchMssFallback();
+      } catch (e) {
         return [];
       }
     }));

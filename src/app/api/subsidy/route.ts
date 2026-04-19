@@ -26,7 +26,7 @@ async function fetchHsbiz(): Promise<SubsidyItem[]> {
   try {
     const res = await axios.post('https://platform.hsbiz.or.kr/api/business/search', {
       page: 1,
-      size: 20, // 20개로 제한
+      size: 20,
       searchText: "",
       sort: "latest"
     }, {
@@ -66,7 +66,6 @@ async function fetchKStartup(): Promise<SubsidyItem[]> {
         const xml = await res.text();
         const feed = await parser.parseString(xml);
         
-        // 상위 30개로 대폭 제한 (총 300+개 중 최신만)
         return feed.items.slice(0, 30).map(item => ({
             id: `kstartup-${item.guid || item.link || item.title}`,
             ministry: '중기부/창진원',
@@ -74,7 +73,7 @@ async function fetchKStartup(): Promise<SubsidyItem[]> {
             title: item.title || '',
             link: item.link || 'https://www.k-startup.go.kr',
             date: item.pubDate || new Date().toISOString(),
-            description: (item.contentSnippet || item.content || '').substring(0, 200) || 'K-Startup 최신 지원사업 공고입니다.',
+            description: (item.contentSnippet || item.content || '').substring(0, 200) || 'K-Startup 최신 지원사업 공식 공고입니다.',
             source: 'K-Startup',
             isLocal: false
         }));
@@ -94,7 +93,7 @@ async function fetchBizinfo(): Promise<SubsidyItem[]> {
         const items: SubsidyItem[] = [];
 
         $('.table_style01 tbody tr').each((i, el) => {
-            if (i >= 20) return; // 20개 제한
+            if (i >= 20) return;
             const title = $(el).find('.txt_left a').text().trim();
             const link = $(el).find('.txt_left a').attr('href');
             const date = $(el).find('td').eq(4).text().trim();
@@ -120,35 +119,12 @@ async function fetchBizinfo(): Promise<SubsidyItem[]> {
     }
 }
 
-// 4. 범용 백업 (Google News RSS)
-async function fetchGoogleNewsFallback(query: string, sourceName: string): Promise<SubsidyItem[]> {
-  try {
-    const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}+when:7d&hl=ko&gl=KR&ceid=KR:ko`;
-    const feed = await parser.parseURL(url);
-    
-    return feed.items.slice(0, 3).map((item: any) => ({
-      id: `news-${item.guid || item.link}`,
-      ministry: sourceName,
-      category: '지원사업',
-      title: item.title,
-      link: item.link,
-      date: item.pubDate,
-      description: item.contentSnippet || '최신 지원사업 관련 뉴스 소식입니다.',
-      source: `뉴스/${sourceName}`,
-      isLocal: item.title.includes('화성') || item.title.includes('경기')
-    }));
-  } catch (e) {
-    return [];
-  }
-}
-
 export async function GET() {
   try {
     const results = await Promise.allSettled([
       fetchHsbiz(),
       fetchKStartup(),
-      fetchBizinfo(),
-      fetchGoogleNewsFallback('정부지원사업 공고', '통합뉴스')
+      fetchBizinfo()
     ]);
 
     const items = results
@@ -156,13 +132,7 @@ export async function GET() {
         .map(r => r.value)
         .flat();
 
-    // 직접 수집 데이터를 상단으로 배치하기 위해 정렬 시 가중치 부여
-    items.sort((a, b) => {
-        const isANews = a.source.startsWith('뉴스') ? 1 : 0;
-        const isBNews = b.source.startsWith('뉴스') ? 1 : 0;
-        if (isANews !== isBNews) return isANews - isBNews;
-        return new Date(b.date).getTime() - new Date(a.date).getTime();
-    });
+    items.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     return NextResponse.json({ 
       success: true, 
