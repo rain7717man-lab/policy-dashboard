@@ -24,12 +24,12 @@ type DataStore   = Record<string, SourceState>;
 const SOURCE_IDS = ['정책브리핑', 'K-Startup', '보조금24', '중기부/소진공', '경기/화성비즈'];
 
 const TABS = [
+  { id: '알맹이',     label: '✨ 상세/신청(알맹이)', icon: Sparkles,  color: 'text-indigo-600' },
   { id: '정책브리핑',  label: '🏛️ 정책브리핑',   icon: Landmark,   color: 'text-blue-600' },
   { id: 'K-Startup',  label: '🚀 K-Startup',   icon: Rocket,     color: 'text-orange-600' },
   { id: '보조금24',    label: '🛡️ 보조금24',     icon: ShieldCheck, color: 'text-emerald-600' },
   { id: '중기부/소진공', label: '🏢 중기부/소진공', icon: Building2,  color: 'text-purple-600' },
   { id: '경기/화성비즈', label: '🍎 경기/화성비즈', icon: Apple,      color: 'text-red-600' },
-  { id: '알맹이',     label: '✨ 상세/신청(알맹이)', icon: Sparkles,  color: 'text-indigo-600' },
 ];
 
 const mkInitial = (): DataStore =>
@@ -37,7 +37,7 @@ const mkInitial = (): DataStore =>
 
 export default function Dashboard() {
   const [dataStore, setDataStore] = useState<DataStore>(mkInitial());
-  const [activeTab, setActiveTab] = useState('정책브리핑');
+  const [activeTab, setActiveTab] = useState('알맹이');
   const [searchQuery, setSearchQuery] = useState('');
   const [toast, setToast] = useState({ show: false, msg: '' });
 
@@ -97,10 +97,13 @@ export default function Dashboard() {
     }
   }, [showToast]); // dataStore 의존성 제거 → 재호출 루프 차단
 
-  // 최초 마운트 시 첫 탭만 로드
-  useEffect(() => { fetchSource('정책브리핑'); }, [fetchSource]);
+  // 최초 마운트 시: 알맹이 탭이 기본이므로 정책브리핑+K-Startup 백그라운드 프리로드
+  useEffect(() => {
+    fetchSource('정책브리핑');
+    fetchSource('K-Startup');
+  }, [fetchSource]);
 
-  // 탭 전환 시 해당 탭 레이지 로딩
+  // 탭 전환 시 해당 탭 레이지 로딩 (알맹이 탭은 별도 fetch 불필요)
   useEffect(() => {
     if (activeTab !== '알맹이') fetchSource(activeTab);
   }, [activeTab, fetchSource]);
