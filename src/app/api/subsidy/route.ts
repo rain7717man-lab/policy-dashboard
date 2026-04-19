@@ -31,11 +31,12 @@ async function fetchHsbiz(): Promise<SubsidyItem[]> {
       sort: "latest"
     }, {
       httpsAgent,
-      timeout: 5000,
+      timeout: 8000,
       headers: {
         'Content-Type': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        'Referer': 'https://platform.hsbiz.or.kr/business/list'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Referer': 'https://platform.hsbiz.or.kr/business/list',
+        'Origin': 'https://platform.hsbiz.or.kr'
       }
     });
 
@@ -56,47 +57,118 @@ async function fetchHsbiz(): Promise<SubsidyItem[]> {
   }
 }
 
-// 2. 범용 백업 (Google News RSS) - K-Startup, 경기도 등 키워드 기반
-async function fetchGoogleNewsFallback(query: string, sourceName: string, isLocal = false): Promise<SubsidyItem[]> {
+// 2. K-Startup 직접 수집 (RSS)
+async function fetchKStartup(): Promise<SubsidyItem[]> {
+    try {
+        const url = 'https://www.k-startup.go.kr/web/contents/rss/bizpbanc-ongoing.do';
+        const res = await fetch(url, {
+             headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' }
+        });
+        const xml = await res.text();
+        const feed = await parser.parseString(xml);
+        
+        return feed.items.map(item => ({
+            id: `kstartup-${item.guid || item.link || item.title}`,
+            ministry: '중기부/창진원',
+            category: '지원사업',
+            title: item.title || '',
+            link: item.link || 'https://www.k-startup.go.kr',
+            date: item.pubDate || new Date().toISOString(),
+            description: (item.contentSnippet || item.content || '').substring(0, 200) || 'K-Startup 최신 지원사업 공고입니다.',
+            source: 'K-Startup',
+            isLocal: false
+        }));
+    } catch (e) {
+        console.error('K-Startup RSS fetch error:', e);
+        return [];
+    }
+}
+
+// 3. 기업마당(Bizinfo) 직접 크롤링
+async function fetchBizinfo(): Promise<SubsidyItem[]> {
+    try {
+        const res = await fetch('https://www.bizinfo.go.kr/web/lay1/bbs/S1T122C128/AS/210/list.do', {
+            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' }
+        });
+        const html = await res.text();
+        const $ = cheerio.load(html);
+        const items: SubsidyItem[] = [];
+
+        $('.table_style01 tbody tr').each((_, el) => {
+            const title = $(el).find('.txt_left a').text().trim();
+            const link = $(el).find('.txt_left a').attr('href');
+            const date = $(el).find('td').eq(4).text().trim();
+            const ministry = $(el).find('td').eq(2).text().trim();
+
+            if (title) {
+                items.push({
+                    id: `bizinfo-${title}`,
+                    ministry: ministry || '기타',
+                    category: '지원사업',
+                    title,
+                    link: link ? `https://www.bizinfo.go.kr${link}` : 'https://www.bizinfo.go.kr',
+                    date: date || new Date().toISOString(),
+                    description: '기업마당(Bizinfo)에 등록된 최신 지원사업 공식 공고입니다.',
+                    source: '기업마당',
+                    isLocal: title.includes('화성') || title.includes('경기')
+                });
+            }
+        });
+        return items;
+    } catch (e) {
+        console.error('Bizinfo fetch error:', e);
+        return [];
+    }
+}
+
+// 4. 범용 백업 (Google News RSS)
+async function fetchGoogleNewsFallback(query: string, sourceName: string): Promise<SubsidyItem[]> {
   try {
     const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}+when:7d&hl=ko&gl=KR&ceid=KR:ko`;
     const feed = await parser.parseURL(url);
     
-    return feed.items.slice(0, 10).map((item: any) => ({
+    return feed.items.slice(0, 3).map((item: any) => ({
       id: `news-${item.guid || item.link}`,
       ministry: sourceName,
       category: '지원사업',
       title: item.title,
       link: item.link,
       date: item.pubDate,
-      description: item.contentSnippet || '최신 지원사업 소식입니다. 원문에서 상세 내용을 확인하세요.',
-      source: sourceName,
-      isLocal: isLocal || item.title.includes('화성') || item.title.includes('경기')
+      description: item.contentSnippet || '최신 지원사업 관련 뉴스 소식입니다.',
+      source: `뉴스/${sourceName}`,
+      isLocal: item.title.includes('화성') || item.title.includes('경기')
     }));
   } catch (e) {
-    console.error(`Google News (${query}) error:`, e);
     return [];
   }
 }
 
 export async function GET() {
   try {
-    // 여러 출처 병렬 수집
-    const [hsbizItems, kstartupItems, gyeonggiItems] = await Promise.all([
+    const results = await Promise.allSettled([
       fetchHsbiz(),
-      fetchGoogleNewsFallback('창업진흥원 K-Startup 지원사업 공고', 'K-Startup'),
-      fetchGoogleNewsFallback('경기도 지원사업 공고 egBiz', '경기업비저', true)
+      fetchKStartup(),
+      fetchBizinfo(),
+      fetchGoogleNewsFallback('정부지원사업 공고', '통합뉴스')
     ]);
 
-    const results = [...hsbizItems, ...kstartupItems, ...gyeonggiItems];
+    const items = results
+        .filter((r): r is PromiseFulfilledResult<SubsidyItem[]> => r.status === 'fulfilled')
+        .map(r => r.value)
+        .flat();
 
-    // 날짜순 정렬
-    results.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    // 직접 수집 데이터를 상단으로 배치하기 위해 정렬 시 가중치 부여
+    items.sort((a, b) => {
+        const isANews = a.source.startsWith('뉴스') ? 1 : 0;
+        const isBNews = b.source.startsWith('뉴스') ? 1 : 0;
+        if (isANews !== isBNews) return isANews - isBNews;
+        return new Date(b.date).getTime() - new Date(a.date).getTime();
+    });
 
     return NextResponse.json({ 
       success: true, 
-      count: results.length, 
-      data: results 
+      count: items.length, 
+      data: items 
     });
   } catch (error) {
     console.error("Subsidy Route Error:", error);

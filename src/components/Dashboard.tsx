@@ -45,17 +45,23 @@ export default function Dashboard() {
     if (isManual) showToast('🔃 최신 공고를 통합 수집하고 있습니다...');
     setLoading(true);
     try {
-      const [rssRes, subsidyRes] = await Promise.all([
+      const results = await Promise.allSettled([
         fetch(`/api/rss?t=${Date.now()}`, { cache: 'no-store' }),
         fetch(`/api/subsidy?t=${Date.now()}`, { cache: 'no-store' })
       ]);
       
-      const rssJson = await rssRes.json();
-      const subsidyJson = await subsidyRes.json();
-      
       let combined: FeedItem[] = [];
-      if (rssJson.success) combined = [...combined, ...rssJson.data];
-      if (subsidyJson.success) combined = [...combined, ...subsidyJson.data];
+      let anySuccess = false;
+
+      for (const res of results) {
+        if (res.status === 'fulfilled' && res.value.ok) {
+            const json = await res.value.json();
+            if (json.success && json.data) {
+                combined = [...combined, ...json.data];
+                anySuccess = true;
+            }
+        }
+      }
 
       // 날짜 기준 정렬
       combined.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
