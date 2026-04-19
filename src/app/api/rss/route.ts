@@ -8,8 +8,8 @@ const parser = new Parser<CustomFeed, CustomItem>();
 
 const RSS_URL = 'https://www.korea.kr/rss/pressrelease.xml';
 
-// 60초 캐싱을 적용하여 짧은 시간 반복 요청에 의한 네트워크 에러(Rate Limit) 방지
-export const revalidate = 60;
+// 캐싱 방지: 매 요청마다 RSS 서버에서 최신 정보를 가져옵니다.
+export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
