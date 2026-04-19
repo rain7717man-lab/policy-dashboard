@@ -11,6 +11,14 @@ const RSS_URL = 'https://www.korea.kr/rss/pressrelease.xml';
 // 캐싱 방지: 매 요청마다 RSS 서버에서 최신 정보를 가져옵니다.
 export const dynamic = 'force-dynamic';
 
+const LOCAL_KEYWORDS = ['화성', '경기도', '경기', '수원', '용인', '성남', '안산', '부천', '고양'];
+
+function isLocalItem(title: string, ministry: string): boolean {
+  return LOCAL_KEYWORDS.some(
+    (kw) => title.includes(kw) || ministry.includes(kw)
+  );
+}
+
 export async function GET() {
   try {
     const feed = await parser.parseURL(RSS_URL);
@@ -20,11 +28,8 @@ export async function GET() {
       let ministry = '기타 부처';
       let title = item.title || '';
       
-      // 정규식으로 대괄호 안의 텍스트 추출 (보도자료 등의 말머리 제외를 위해 먼저 가장 긴 단일 부처명을 찾거나, 단순 추출 후 보정)
       const matches = title.match(/\[(.*?)\]/g);
       if (matches && matches.length > 0) {
-        // 보통 첫 번째 말머리가 부처명(또는 위원회)임. [보도자료] 처럼 되어 있을 수도 있음.
-        // 가능한 부처 이름이 들어간 것을 택함
         let extracted = matches[0].replace(/\[|\]/g, '').trim();
         if (extracted === '보도자료' && matches.length > 1) {
             extracted = matches[1].replace(/\[|\]/g, '').trim();
@@ -43,13 +48,9 @@ export async function GET() {
         category = '생활/복지';
       }
       
-      // 요약 내용이 없을 경우 대체 텍스트 삽입
       let content = (item.contentSnippet || item.content || item.description || '').trim();
-      
-      // HTML 태그 강제 제거 및 공백 정리
       content = content.replace(/<[^>]*>?/gm, '').replace(/&nbsp;/g, ' ').trim();
       
-      // 의미없는 단순 안내 문구일 경우 예외 처리
       if (!content || content.includes('[자료제공 :(') || content.includes('www.korea.kr') && content.length < 50) {
           content = "원문을 참조해 주세요.";
       }
@@ -62,6 +63,8 @@ export async function GET() {
         link: item.link,
         date: item.pubDate,
         description: content,
+        source: 'korea.kr',
+        isLocal: isLocalItem(title, ministry),
       };
     });
 

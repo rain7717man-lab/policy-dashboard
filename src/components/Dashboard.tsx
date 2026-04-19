@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Copy, ExternalLink, RefreshCw, Search } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { MASTER_PROMPT, SUBSIDY_PROMPT } from '@/lib/constants';
+import { MASTER_PROMPT } from '@/lib/constants';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -18,10 +18,12 @@ type FeedItem = {
   link: string;
   date: string;
   description: string;
+  source?: string;
+  isLocal?: boolean;
 };
 
-const CATEGORIES = ['전체보기', '📌 상세/신청 (알맹이)', '경제/부동산', '생활/복지', '기타 부처'];
-const ALMAENGI_KEYWORDS = ["세부", "기준", "신청", "안내", "Q&A", "본격", "실시", "가이드"];
+const CATEGORIES = ['전체보기', '📌 상세/신청 (알맹이)', '경제/부동산', '생활/복지', '창업/스타트업', '소상공인', '지역지원', '기타 부처'];
+const ALMAENGI_KEYWORDS = ["세부", "기준", "신청", "안내", "Q&A", "본격", "실시", "가이드", "공고", "모집"];
 
 // 모든 탭에 공통 적용되는 블랙리스트 (단순 동정·행사 기사 제외)
 const BLACKLIST_KEYWORDS = ["동정", "인사", "위촉", "표창", "간담회", "방문", "장관", "차관", "국무총리", "총리", "대통령", "기념식", "개최", "참석", "MOU", "업무협약", "발족"];
@@ -33,23 +35,44 @@ export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState('');
   const [toast, setToast] = useState<{ show: boolean; msg: string }>({ show: false, msg: '' });
 
-
   const showToast = useCallback((msg: string) => {
     setToast({ show: true, msg });
-    setTimeout(() => setToast({ show: false, msg: '' }), 2000);
+    setTimeout(() => setToast({ show: false, msg: '' }), 2500);
   }, []);
 
   const fetchFeeds = useCallback(async (isManual = false) => {
     if (isManual) showToast('🔃 최신 보도자료를 확인하고 있습니다...');
     setLoading(true);
     try {
-      const res = await fetch(`/api/rss?t=${Date.now()}`, { cache: 'no-store' });
-      const json = await res.json();
-      if (json.success) {
-        setItems(json.data);
+      // 기존 정책 RSS + 지원사업 크롤링 병렬 호출
+      const [rssRes, subsidyRes] = await Promise.allSettled([
+        fetch(`/api/rss?t=${Date.now()}`, { cache: 'no-store' }),
+        fetch(`/api/subsidy?t=${Date.now()}`, { cache: 'no-store' }),
+      ]);
+
+      const allItems: FeedItem[] = [];
+
+      if (rssRes.status === 'fulfilled' && rssRes.value.ok) {
+        const json = await rssRes.value.json();
+        if (json.success) allItems.push(...json.data);
+      }
+
+      if (subsidyRes.status === 'fulfilled' && subsidyRes.value.ok) {
+        const json = await subsidyRes.value.json();
+        if (json.success) allItems.push(...json.data);
+      }
+
+      if (allItems.length > 0) {
+        // 날짜 역순 정렬, 지역특화 공고를 상단에 배치
+        allItems.sort((a, b) => {
+          // 지역특화 우선
+          if (a.isLocal && !b.isLocal) return -1;
+          if (!a.isLocal && b.isLocal) return 1;
+          return new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime();
+        });
+        setItems(allItems);
         if (isManual) showToast('✅ 최신글 업데이트 완료!');
       } else {
-        console.warn('API Error (No Success):', json);
         if (isManual) showToast('❌ 데이터를 불러오지 못했습니다.');
       }
     } catch (e) {
@@ -69,13 +92,6 @@ export default function Dashboard() {
       showToast('하이엔드 v2 프롬프트가 복사되었습니다! 노트북LM에 PDF와 함께 넣어주세요.');
     });
   };
-
-  const copySubsidyPrompt = () => {
-    navigator.clipboard.writeText(SUBSIDY_PROMPT).then(() => {
-      showToast('🎁 지원사업 전문 프롬프트가 복사되었습니다! 노트북LM에 공고 PDF와 함께 넣어주세요.');
-    });
-  };
-
 
   const filteredItems = items.filter((item) => {
     const isBlocked = BLACKLIST_KEYWORDS.some((kw) => item.title.includes(kw));
@@ -112,7 +128,7 @@ export default function Dashboard() {
             정책/지원금 통합 모니터링
           </h1>
           <p className="text-sm text-gray-500 mt-1 dark:text-gray-400 font-medium sm:text-base sm:mt-2">
-            정부 전 부처 보도자료 확인 및 자동화 대시보드
+            정부 전 부처 보도자료 + 7개 지원사업 사이트 실시간 수집
           </p>
         </div>
 
@@ -136,6 +152,7 @@ export default function Dashboard() {
           <div className="flex gap-1.5 bg-white dark:bg-gray-800 p-1.5 rounded-2xl w-max min-w-full sm:w-fit shadow-sm border border-gray-100 dark:border-gray-700">
             {CATEGORIES.map((cat) => {
               const isHighlight = cat === '📌 상세/신청 (알맹이)';
+              const isLocal = cat === '지역지원';
               return (
                 <button
                   key={cat}
@@ -145,10 +162,14 @@ export default function Dashboard() {
                     activeTab === cat
                       ? isHighlight
                         ? "bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-md shadow-indigo-500/30"
-                        : "bg-blue-600 text-white shadow-md shadow-blue-500/20"
+                        : isLocal
+                          ? "bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-md shadow-emerald-500/30"
+                          : "bg-blue-600 text-white shadow-md shadow-blue-500/20"
                       : isHighlight
                         ? "text-purple-700 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/30 font-extrabold"
-                        : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                        : isLocal
+                          ? "text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 font-extrabold"
+                          : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                   )}
                 >
                   {cat}
@@ -198,56 +219,66 @@ export default function Dashboard() {
           {filteredItems.map((item) => (
             <div
               key={item.id}
-              className="group bg-white dark:bg-gray-800 rounded-2xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-xl hover:border-blue-200 dark:hover:border-blue-900 transition-all duration-300 relative flex flex-col"
+              className={cn(
+                "group bg-white dark:bg-gray-800 rounded-2xl p-4 sm:p-6 border shadow-sm hover:shadow-xl transition-all duration-300 relative flex flex-col",
+                item.isLocal
+                  ? "border-emerald-300 dark:border-emerald-700 hover:border-emerald-400 dark:hover:border-emerald-600"
+                  : "border-gray-200 dark:border-gray-700 hover:border-blue-200 dark:hover:border-blue-900"
+              )}
             >
-
-                <div className="flex items-center justify-between mb-3 sm:mb-4">
-                  <span className={cn(
-                    "text-xs font-bold px-2.5 py-1.5 rounded-lg",
-                    item.category === '경제/부동산' ? "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-400" :
-                    item.category === '생활/복지' ? "bg-pink-100 text-pink-800 dark:bg-pink-900/40 dark:text-pink-400" :
-                    "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300"
-                  )}>
-                    {item.ministry}
-                  </span>
-                  <span className="text-xs font-medium text-gray-500 dark:text-gray-400 sm:text-sm">
-                    {new Date(item.date).toLocaleDateString('ko-KR')}
+              {/* 지역특화 배지 */}
+              {item.isLocal && (
+                <div className="absolute -top-2.5 left-4">
+                  <span className="inline-flex items-center gap-1 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-xs font-extrabold px-2.5 py-1 rounded-full shadow-md shadow-emerald-500/30">
+                    🏅 지역특화
                   </span>
                 </div>
+              )}
 
-                <h3 className="text-base font-bold text-gray-900 dark:text-white mb-2 line-clamp-2 leading-snug group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors sm:text-lg sm:mb-3" title={item.title}>
-                  {item.title}
-                </h3>
+              <div className={cn("flex items-center justify-between mb-3 sm:mb-4", item.isLocal && "mt-2")}>
+                <span className={cn(
+                  "text-xs font-bold px-2.5 py-1.5 rounded-lg",
+                  item.category === '경제/부동산' ? "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-400" :
+                  item.category === '생활/복지' ? "bg-pink-100 text-pink-800 dark:bg-pink-900/40 dark:text-pink-400" :
+                  item.category === '창업/스타트업' ? "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-400" :
+                  item.category === '소상공인' ? "bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-400" :
+                  item.category === '지역지원' ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-400" :
+                  "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300"
+                )}>
+                  {item.ministry}
+                </span>
+                <span className="text-xs font-medium text-gray-500 dark:text-gray-400 sm:text-sm">
+                  {new Date(item.date).toLocaleDateString('ko-KR')}
+                </span>
+              </div>
 
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4 line-clamp-3 leading-relaxed flex-grow sm:mb-5" title={item.description}>
-                  {item.description}
-                </p>
+              <h3 className="text-base font-bold text-gray-900 dark:text-white mb-2 line-clamp-2 leading-snug group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors sm:text-lg sm:mb-3" title={item.title}>
+                {item.title}
+              </h3>
 
-                <div className="space-y-2 mt-auto pt-3 border-t border-gray-100 dark:border-gray-700 sm:pt-4 sm:space-y-2.5">
-                  <button
-                    onClick={() => copyPrompt()}
-                    className="w-full flex items-center justify-center gap-2 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold transition-all shadow-md shadow-indigo-500/20 active:scale-[0.97] min-h-[52px]"
-                  >
-                    <Copy className="w-4 h-4 shrink-0" />
-                    📝 원고 작성 프롬프트 복사
-                  </button>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4 line-clamp-3 leading-relaxed flex-grow sm:mb-5" title={item.description}>
+                {item.description}
+              </p>
 
-                  <button
-                    onClick={() => copySubsidyPrompt()}
-                    className="w-full flex items-center justify-center gap-2 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold transition-all shadow-md shadow-emerald-500/20 active:scale-[0.97] min-h-[52px]"
-                  >
-                    <Copy className="w-4 h-4 shrink-0" />
-                    🎁 정부지원사업 원고 생성
-                  </button>
+              <div className="space-y-2 mt-auto pt-3 border-t border-gray-100 dark:border-gray-700 sm:pt-4 sm:space-y-2.5">
+                {/* 버튼 ① 원고 작성 프롬프트 복사 */}
+                <button
+                  onClick={() => copyPrompt()}
+                  className="w-full flex items-center justify-center gap-2 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold transition-all shadow-md shadow-indigo-500/20 active:scale-[0.97] min-h-[52px]"
+                >
+                  <Copy className="w-4 h-4 shrink-0" />
+                  📝 원고 작성 프롬프트 복사
+                </button>
 
-                  <button
-                    onClick={() => window.open(item.link, '_blank')}
-                    className="w-full flex items-center justify-center gap-2 py-3 bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 rounded-xl text-sm font-bold transition-all active:scale-[0.97] min-h-[48px]"
-                  >
-                    <ExternalLink className="w-4 h-4 shrink-0" />
-                    원문 보기 (PDF 다운로드)
-                  </button>
-                </div>
+                {/* 버튼 ② 원문 보기 */}
+                <button
+                  onClick={() => window.open(item.link, '_blank')}
+                  className="w-full flex items-center justify-center gap-2 py-3 bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 rounded-xl text-sm font-bold transition-all active:scale-[0.97] min-h-[48px]"
+                >
+                  <ExternalLink className="w-4 h-4 shrink-0" />
+                  📄 원문 보기 (PDF 다운로드)
+                </button>
+              </div>
             </div>
           ))}
         </div>
