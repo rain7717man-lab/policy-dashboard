@@ -151,16 +151,12 @@ export async function scrapeKStartup(limit = 100): Promise<FeedItem[]> {
 //    https://apis.data.go.kr/B554287/LocalGovernmentBenefitService
 // ─────────────────────────────────────────────────────────
 export async function scrapeGov24(limit = 100): Promise<FeedItem[]> {
-  const BASE = 'https://apis.data.go.kr/B554287/LocalGovernmentBenefitService/getLocalGovernmentBenefitList';
+  // ⚠️ params 객체 금지: 이미 인코딩된 API_KEY가 이중 인코딩되어 NoAuthority 에러 발생
+  // 템플릿 리터럴로 URL에 직접 삽입
+  const url = `https://apis.data.go.kr/B554287/LocalGovernmentBenefitService/getLocalGovernmentBenefitList?serviceKey=${API_KEY}&pageNo=1&numOfRows=${limit}&_type=json`;
+  console.log('[보조금24] 공공데이터포털 OpenAPI 호출...');
   try {
-    console.log('[보조금24] 공공데이터포털 OpenAPI 호출...');
-    const res = await axios.get(BASE, {
-      params: {
-        serviceKey: API_KEY,
-        pageNo:     1,
-        numOfRows:  limit,
-        _type:      'json',
-      },
+    const res = await axios.get(url, {
       headers: CHROME_HEADERS,
       httpsAgent: http,
       timeout:    15000,
@@ -169,7 +165,7 @@ export async function scrapeGov24(limit = 100): Promise<FeedItem[]> {
     const body  = res.data?.response?.body;
     const items = body?.items?.item;
     if (!items) {
-      console.warn('[보조금24] ⚠️ 응답 구조 이상 — 원문:', JSON.stringify(res.data).slice(0, 300));
+      console.warn('[보조금24] ⚠️ 응답 구조 이상 — 원문:', JSON.stringify(res.data).slice(0, 400));
       return [];
     }
     const list: any[] = Array.isArray(items) ? items : [items];
@@ -191,8 +187,7 @@ export async function scrapeGov24(limit = 100): Promise<FeedItem[]> {
       ),
     })).slice(0, limit);
   } catch (e: any) {
-    console.error(`[보조금24] ❌ ${e.response?.status ?? e.message}`);
-    // 폴백: 중기부 지원사업 API에서 보조금성 필터
+    console.error('[보조금24] ❌ API Error Response:', e.response?.data ?? e.message);
     return [];
   }
 }
@@ -203,16 +198,11 @@ export async function scrapeGov24(limit = 100): Promise<FeedItem[]> {
 //    https://apis.data.go.kr/1421000/mssBizService_v2/getbizList_v2
 // ─────────────────────────────────────────────────────────
 async function fetchMSSBiz(limit: number): Promise<any[]> {
-  const BASE = 'https://apis.data.go.kr/1421000/mssBizService_v2/getbizList_v2';
+  // ⚠️ params 객체 금지: 이중 인코딩 방지 — URL에 직접 삽입
+  const url = `https://apis.data.go.kr/1421000/mssBizService_v2/getbizList_v2?serviceKey=${API_KEY}&pageNo=1&numOfRows=${limit}&type=json&_type=json`;
+  console.log('[중기부API] 공공데이터포털 OpenAPI 호출...');
   try {
-    console.log('[중기부API] 공공데이터포털 OpenAPI 호출...');
-    const res = await axios.get(BASE, {
-      params: {
-        serviceKey: API_KEY,
-        pageNo:     1,
-        numOfRows:  limit,
-        type:       'json',
-      },
+    const res = await axios.get(url, {
       headers: CHROME_HEADERS,
       httpsAgent: http,
       timeout:    15000,
@@ -221,16 +211,14 @@ async function fetchMSSBiz(limit: number): Promise<any[]> {
     const body  = res.data?.response?.body ?? res.data?.body;
     const items = body?.items?.item ?? body?.items;
     if (!items) {
-      console.warn('[중기부API] ⚠️ 응답 구조 이상 — 원문:', JSON.stringify(res.data).slice(0, 300));
-      // bizinfo.go.kr 폴백 시도
+      console.warn('[중기부API] ⚠️ 응답 구조 이상 — 원문:', JSON.stringify(res.data).slice(0, 400));
       return fetchBizInfoRSS();
     }
     const list: any[] = Array.isArray(items) ? items : [items];
     console.log(`[중기부API] ✅ ${list.length}건 수신 (총 ${body?.totalCount}건)`);
     return list;
   } catch (e: any) {
-    console.error(`[중기부API] ❌ ${e.response?.status ?? e.message}`);
-    // 폴백
+    console.error('[중기부API] ❌ API Error Response:', e.response?.data ?? e.message);
     return fetchBizInfoRSS();
   }
 }
@@ -238,7 +226,8 @@ async function fetchMSSBiz(limit: number): Promise<any[]> {
 /** 기업마당(bizinfo.go.kr) RSS 폴백 */
 async function fetchBizInfoRSS(): Promise<any[]> {
   const URLS = [
-    `https://www.bizinfo.go.kr/uss/rss/bizinfoApi.do?crtfcKey=${API_KEY}&dataType=json&numOfRows=100`,
+    // crtfcKey도 직접 삽입 (이중 인코딩 방지)
+    `https://www.bizinfo.go.kr/uss/rss/bizinfoApi.do?crtfcKey=${API_KEY}&dataType=JSON&numOfRows=100`,
     'https://www.bizinfo.go.kr/uss/rss/bizinfoRss.do',
   ];
   for (const url of URLS) {
@@ -265,7 +254,7 @@ async function fetchBizInfoRSS(): Promise<any[]> {
         }));
       }
     } catch (e: any) {
-      console.error(`[기업마당] ❌ ${url} — ${e.response?.status ?? e.message}`);
+      console.error('[기업마당] ❌ API Error Response:', e.response?.data ?? e.message);
     }
   }
   return [];
