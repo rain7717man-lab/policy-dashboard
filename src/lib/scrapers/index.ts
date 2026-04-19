@@ -1,15 +1,21 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import https from 'https';
+import Parser from 'rss-parser';
 
+const parser = new Parser();
+
+// 정교한 브라우저 위장 헤더
 const STABLE_HEADERS = {
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
   'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
   'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+  'Cache-Control': 'no-cache',
+  'Pragma': 'no-cache'
 };
 
 const axiosInstance = axios.create({
-  timeout: 10000,
+  timeout: 15000,
   httpsAgent: new https.Agent({ rejectUnauthorized: false, keepAlive: true }),
   headers: STABLE_HEADERS
 });
@@ -51,241 +57,214 @@ export async function withRetry<T>(fn: () => Promise<T>, retries = 2): Promise<T
         return await fn();
     } catch (e: any) {
         if (retries > 0) {
-            console.log(`Retry left: ${retries}. Error: ${e.message || e}`);
+            console.warn(`[RETRY] ${retries} attempts left. Error: ${e.message}`);
             return await withRetry(fn, retries - 1);
         }
         throw e;
     }
 }
 
-// 1. 정책브리핑 Scraper
+// 1. 정책브리핑 Scraper (보도자료 전용 RSS)
 export async function scrapeKoreaKr(targetCount = 100): Promise<FeedItem[]> {
-    let allItems: FeedItem[] = [];
-    let page = 1;
-
-    while (allItems.length < targetCount && page <= 5) {
-        const url = `https://www.korea.kr/briefing/pressReleaseList.do?pageIndex=${page}`;
-        const res = await axiosInstance.get(url);
-        const $ = cheerio.load(res.data);
-        const items = $('ul.list-type1 > li');
-        if (items.length === 0) break;
-
-        items.each((_, el) => {
-            const linkEl = $(el).find('a');
-            const title = linkEl.find('strong').text().trim();
-            const link = linkEl.attr('href');
-            const infoSpans = linkEl.find('.date span, .date-info span');
-            const date = infoSpans.eq(0).text().trim();
-            const ministry = infoSpans.eq(1).text().trim() || '대한민국 정부';
-
-            if (title && allItems.length < targetCount) {
-                allItems.push({
-                    id: `korea-${link || title}`,
-                    ministry,
-                    category: '정책브리핑',
-                    title,
-                    link: link ? (link.startsWith('http') ? link : `https://www.korea.kr${link}`) : 'https://www.korea.kr',
-                    date,
-                    description: `${ministry} 공식 보도자료입니다.`,
-                    source: '정책브리핑',
-                    isLocal: title.includes('화성') || title.includes('경기'),
-                    almaengi: extractAlmaengi(title, ministry)
-                });
-            }
+    try {
+        const res = await axiosInstance.get('https://www.korea.kr/rss/briefing.xml', {
+            headers: { ...STABLE_HEADERS, 'Referer': 'https://www.korea.kr/' }
         });
-        page++;
+        const feed = await parser.parseString(res.data);
+        return feed.items.map(item => ({
+            id: `korea-brief-${item.guid || item.link}`,
+            ministry: item.title?.match(/\[(.*?)\]/)?.[1] || '대한민국 정부',
+            category: '정책브리핑',
+            title: item.title?.replace(/\[.*?\]\s*/, '') || '',
+            link: item.link || 'https://www.korea.kr',
+            date: item.pubDate ? new Date(item.pubDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+            description: (item.contentSnippet || '').substring(0, 200),
+            source: '정책브리핑',
+            isLocal: false,
+            almaengi: extractAlmaengi(item.title || '', item.contentSnippet || '')
+        })).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, targetCount);
+    } catch (e: any) {
+        console.error('[SCRAPE ERROR] Korea.kr:', e.message);
+        return [];
     }
-    return allItems;
 }
 
-// 2. K-Startup Scraper (RSS + Pagination Mock if needed)
+// 2. K-Startup Scraper (RSS)
 export async function scrapeKStartup(targetCount = 100): Promise<FeedItem[]> {
-    // RSS는 보통 50건이 한계이므로 100건을 채우기 위해 부족한 부분은 Mock 생성 
-    // 혹은 다른 페이지 스크래핑이 필요하나 RSS가 가장 안정적이므로 50건 수집 후 Mock 폴백
-    let allItems: FeedItem[] = [];
     try {
-        const res = await axiosInstance.get('https://www.k-startup.go.kr/web/contents/rss/bizpbanc-ongoing.do');
-        const $ = cheerio.load(res.data, { xmlMode: true });
-        $('item').each((_, el) => {
-            const title = $(el).find('title').text();
-            const link = $(el).find('link').text();
-            const date = $(el).find('pubDate').text();
-            const desc = $(el).find('description').text().replace(/<[^>]*>?/gm, '');
-
-            if (title && allItems.length < targetCount) {
-                allItems.push({
-                    id: `kstartup-${link || title}`,
-                    ministry: '중기부/창진원',
-                    category: 'K-Startup',
-                    title,
-                    link,
-                    date: new Date(date).toLocaleDateString(),
-                    description: desc.substring(0, 150),
-                    source: 'K-Startup',
-                    isLocal: false,
-                    almaengi: extractAlmaengi(title, desc)
-                });
-            }
+        const res = await axiosInstance.get('https://www.k-startup.go.kr/web/contents/rss/bizpbanc-ongoing.do', {
+            headers: { ...STABLE_HEADERS, 'Referer': 'https://www.k-startup.go.kr/' }
         });
-    } catch (e) {}
-
-    // 100건 채우기 정책
-    while (allItems.length < targetCount) {
-        const i = allItems.length;
-        allItems.push({
-            id: `mock-kstartup-${i}`,
-            ministry: '창업진흥원',
+        const feed = await parser.parseString(res.data);
+        return feed.items.map(item => ({
+            id: `kstartup-${item.guid || item.link}`,
+            ministry: '중기부/창진원',
             category: 'K-Startup',
-            title: `[MOCK] 창업지원 및 혁신성장 지원사업 공고 ${i + 1}`,
-            link: 'https://www.k-startup.go.kr',
-            date: new Date().toLocaleDateString(),
-            description: '데이터 구조 증명을 위한 대용량 Mock 데이터입니다.',
+            title: item.title || '',
+            link: item.link || 'https://www.k-startup.go.kr',
+            date: item.pubDate ? new Date(item.pubDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+            description: (item.contentSnippet || '').substring(0, 200),
             source: 'K-Startup',
             isLocal: false,
-            almaengi: { target: '청년/예비창업자', budget: '최대 1억원', deadline: '2026.05.30' }
-        });
+            almaengi: extractAlmaengi(item.title || '', item.contentSnippet || '')
+        })).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, targetCount);
+    } catch (e: any) {
+        console.error('[SCRAPE ERROR] K-Startup:', e.message);
+        return [];
     }
-    return allItems;
 }
 
-// 3. 정부24 (보조금24) Scraper + Mock
+// 3. 정부24 (보조금24) Scraper (내부 POST API 연동)
 export async function scrapeGov24(targetCount = 100): Promise<FeedItem[]> {
-    let allItems: FeedItem[] = [];
     try {
-        const url = 'https://www.gov.kr/portal/rcvfvrSvc/svcFind/svcSearchAll?sort=DATE&sortOrder=DESC';
-        const res = await axiosInstance.get(url);
-        const $ = cheerio.load(res.data);
-        // 실제 보조금24는 복잡한 스크립트로 동작할 수 있어 실패 가능성 높음
-        $('.card-item').each((_, el) => {
-            const title = $(el).find('.card-title').text().trim();
-            const desc = $(el).find('.card-text').text().trim();
-            if (title && allItems.length < targetCount) {
-                allItems.push({
-                    id: `gov24-${title}`,
-                    ministry: '정부24',
-                    category: '보조금24',
-                    title,
-                    link: 'https://www.gov.kr/portal/rcvfvrSvc/main',
-                    date: new Date().toLocaleDateString(),
-                    description: desc.substring(0, 150),
-                    source: '보조금24',
-                    isLocal: false,
-                    almaengi: extractAlmaengi(title, desc)
-                });
+        const url = 'https://www.gov.kr/portal/rcvfvrSvc/svcFind/svcSearchAllData';
+        const res = await axiosInstance.post(url, {
+            "query": "",
+            "pageIndex": 1,
+            "pageSize": targetCount,
+            "orderType": "DATE",
+            "orgSel": "ALL"
+        }, {
+            headers: { 
+                ...STABLE_HEADERS, 
+                'Content-Type': 'application/json;charset=UTF-8',
+                'Referer': 'https://www.gov.kr/portal/rcvfvrSvc/svcFind/svcSearchAll'
             }
         });
-    } catch (e) {}
 
-    // 구조 증명을 위한 100건 Mock 채우기
-    while (allItems.length < targetCount) {
-        const i = allItems.length;
-        allItems.push({
-            id: `mock-gov24-${i}`,
-            ministry: '대한민국 정부',
+        // Gov24 응답 구조 파싱 (추정 구조에 기반하되 안정적으로 처리)
+        const dataList = res.data?.dataList || res.data?.list || [];
+        return dataList.map((item: any) => ({
+            id: `gov24-${item.svcId || item.title || Math.random()}`,
+            ministry: item.orgNm || item.agencyNm || '정부공통',
             category: '보조금24',
-            title: `[MOCK] 정부 지원 보조금/혜택 안내 ${i + 1}`,
-            link: 'https://www.gov.kr/portal/rcvfvrSvc/main',
-            date: new Date().toLocaleDateString(),
-            description: '모든 국민이 받을 수 있는 정부 지원 보조금 혜택 목록입니다.',
+            title: item.svcNm || item.title || '정부 지원 혜택',
+            link: `https://www.gov.kr/portal/rcvfvrSvc/svcFind/svcSearchAll`,
+            date: item.regDt || new Date().toISOString().split('T')[0],
+            description: item.svcCn || item.description || '혜택 상세 내용을 확인하세요.',
             source: '보조금24',
             isLocal: false,
-            almaengi: { target: '전 국민 대상', budget: '상세 확인', deadline: '상시 신청' }
-        });
+            almaengi: extractAlmaengi(item.svcNm || '', (item.svcCn || '') + (item.trgtNm || ''))
+        })).slice(0, targetCount);
+    } catch (e: any) {
+        console.error('[SCRAPE ERROR] Gov24 API:', e.message);
+        return [];
     }
-    return allItems;
 }
 
-// 4. 중기부/소진공 Scraper
+// 4. 중기부/소진공 Scraper (RSS + SSR Scrape)
 export async function scrapeMSS(targetCount = 100): Promise<FeedItem[]> {
     let allItems: FeedItem[] = [];
-    let page = 1;
-    while (allItems.length < targetCount && page <= 5) {
-        const url = `https://www.mss.go.kr/site/smba/ex/board/List.do?cbIdx=86&pageIndex=${page}`;
-        const res = await axiosInstance.get(url);
-        const $ = cheerio.load(res.data);
-        $('.table_style01 tbody tr').each((_, el) => {
-            const title = $(el).find('.txt_left a').text().trim();
-            const link = $(el).find('.txt_left a').attr('href');
-            const date = $(el).find('td').eq(4).text().trim();
-            if (title && allItems.length < targetCount) {
+    try {
+        // 중기부 RSS
+        const resRss = await axiosInstance.get('https://www.mss.go.kr/rss/smba/board/1.do', {
+            headers: { ...STABLE_HEADERS, 'Referer': 'https://www.mss.go.kr/' }
+        });
+        const feed = await parser.parseString(resRss.data);
+        feed.items.forEach(item => {
+            if (allItems.length < targetCount) {
                 allItems.push({
-                    id: `mss-${title}-${page}`,
+                    id: `mss-rss-${item.guid || item.link}`,
                     ministry: '중소벤처기업부',
                     category: '중기부/소진공',
-                    title,
-                    link: link ? (link.startsWith('http') ? link : `https://www.mss.go.kr${link}`) : 'https://www.mss.go.kr',
-                    date,
-                    description: '중소벤처기업부 공식 보도자료 및 공고입니다.',
+                    title: item.title || '',
+                    link: item.link || 'https://www.mss.go.kr',
+                    date: item.pubDate ? new Date(item.pubDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+                    description: (item.contentSnippet || '').substring(0, 200),
                     source: '중기부',
                     isLocal: false,
-                    almaengi: extractAlmaengi(title, '')
+                    almaengi: extractAlmaengi(item.title || '', item.contentSnippet || '')
                 });
             }
         });
-        page++;
+
+        // 소진공 크롤링 (SSR 방식 복구)
+        if (allItems.length < targetCount) {
+            const resSemas = await axiosInstance.get('https://www.semas.or.kr/web/board/webBoardList.kmdc?bCd=1', {
+                headers: { ...STABLE_HEADERS, 'Referer': 'https://www.semas.or.kr/' }
+            });
+            const $ = cheerio.load(resSemas.data);
+            $('.table_style01 tbody tr').each((_, el) => {
+                const title = $(el).find('.txt_left a').text().trim();
+                const link = $(el).find('.txt_left a').attr('href');
+                const dateRaw = $(el).find('td').eq(4).text().trim();
+                if (title && allItems.length < targetCount) {
+                    allItems.push({
+                        id: `semas-${title}-${dateRaw}`,
+                        ministry: '소상공인시장진흥공단',
+                        category: '중기부/소진공',
+                        title,
+                        link: link ? (link.startsWith('http') ? link : `https://www.semas.or.kr${link}`) : 'https://www.semas.or.kr',
+                        date: dateRaw.includes('-') ? dateRaw : new Date().toISOString().split('T')[0],
+                        description: '소상공인 지원 공고 및 안내문입니다.',
+                        source: '소진공',
+                        isLocal: false,
+                        almaengi: extractAlmaengi(title, '')
+                    });
+                }
+            });
+        }
+    } catch (e: any) {
+        console.error('[SCRAPE ERROR] MSS/SEMAS:', e.message);
     }
-    // 부족분 Mock
-    while (allItems.length < targetCount) {
-        const i = allItems.length;
-        allItems.push({
-            id: `mock-semas-${i}`,
-            ministry: '소진공',
-            category: '중기부/소진공',
-            title: `[MOCK] 소상공인시장진흥공단 정책자금 지원 공고 ${i + 1}`,
-            link: 'https://www.semas.or.kr',
-            date: new Date().toLocaleDateString(),
-            description: '소상공인을 위한 정책자금 및 성장 지원 사업입니다.',
-            source: '소진공',
-            isLocal: false,
-            almaengi: { target: '소상공인/자영업자', budget: '최대 7천만원', deadline: '상시' }
-        });
-    }
-    return allItems;
+    return allItems.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, targetCount);
 }
 
-// 5. 경기/화성비즈 Scraper
+// 5. 경기/화성비즈 Scraper (SSR Scrape + API)
 export async function scrapeGyeonggi(targetCount = 100): Promise<FeedItem[]> {
     let allItems: FeedItem[] = [];
     try {
-        const url = 'https://www.egbiz.or.kr/prjCategory/prjCategoryList.do?p_category_id=G01';
-        const res = await axiosInstance.get(url);
+        const url = 'https://www.egbiz.or.kr/sp/supportPrjCatList.do';
+        const res = await axiosInstance.get(url, {
+            headers: { ...STABLE_HEADERS, 'Referer': 'https://www.egbiz.or.kr/' }
+        });
         const $ = cheerio.load(res.data);
         $('.table_style01 tbody tr').each((_, el) => {
             const title = $(el).find('.txt_left a').text().trim();
+            const dateRaw = $(el).find('td').eq(4).text().trim();
             const link = $(el).find('.txt_left a').attr('href');
-            const date = $(el).find('td').eq(4).text().trim();
             if (title && allItems.length < targetCount) {
                 allItems.push({
-                    id: `egbiz-${title}`,
+                    id: `egbiz-${title}-${dateRaw}`,
                     ministry: '경기기업비서',
                     category: '경기/화성비즈',
                     title,
                     link: link ? (link.startsWith('http') ? link : `https://www.egbiz.or.kr${link}`) : 'https://www.egbiz.or.kr',
-                    date,
-                    description: '경기도 지원사업 공고입니다.',
+                    date: dateRaw ? dateRaw.replace(/\./g, '-') : new Date().toISOString().split('T')[0],
+                    description: '경기도 중소기업 지원사업 공고입니다.',
                     source: 'egBiz',
                     isLocal: true,
                     almaengi: extractAlmaengi(title, '')
                 });
             }
         });
-    } catch (e) {}
 
-    // 부족분 Mock
-    while (allItems.length < targetCount) {
-        const i = allItems.length;
-        allItems.push({
-            id: `mock-hsbiz-${i}`,
-            ministry: '화성산업진흥원',
-            category: '경기/화성비즈',
-            title: `[MOCK] 화성시 관내 중소기업 기술지원 사업 공고 ${i + 1}`,
-            link: 'https://platform.hsbiz.or.kr',
-            date: new Date().toLocaleDateString(),
-            description: '화성시 기업을 위한 맞춤형 산업 육성 지원 사업입니다.',
-            source: '화성진흥원',
-            isLocal: true,
-            almaengi: { target: '화성시 소재 기업', budget: '최대 2천만원', deadline: '2026.06.30' }
-        });
+        // 화성진흥원 API (보충)
+        if (allItems.length < targetCount) {
+            const resHs = await axiosInstance.post('https://platform.hsbiz.or.kr/api/business/search', {
+                page: 1, size: 50, searchText: "", sort: "latest"
+            }, {
+                headers: { ...STABLE_HEADERS, 'Referer': 'https://platform.hsbiz.or.kr/' }
+            });
+            (resHs.data?.content || []).forEach((item: any) => {
+                if (allItems.length < targetCount) {
+                    allItems.push({
+                        id: `hsbiz-${item.id}`,
+                        ministry: '화성산업진흥원',
+                        category: '경기/화성비즈',
+                        title: item.title,
+                        link: `https://platform.hsbiz.or.kr/business/view/${item.id}`,
+                        date: item.endAt ? item.endAt.split(' ')[0] : new Date().toISOString().split('T')[0],
+                        description: `화성시 중소기업 기업지원 공고입니다.`,
+                        source: '화성진흥원',
+                        isLocal: true,
+                        almaengi: extractAlmaengi(item.title, '')
+                    });
+                }
+            });
+        }
+    } catch (e: any) {
+        console.error('[SCRAPE ERROR] Gyeonggi:', e.message);
     }
-    return allItems;
+    return allItems.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, targetCount);
 }

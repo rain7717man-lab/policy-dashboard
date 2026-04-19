@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Copy, ExternalLink, RefreshCw, Search, Landmark, Rocket, Building2, Apple, Sparkles, User, CircleDollarSign, CalendarClock, ShieldCheck } from 'lucide-react';
+import { Copy, ExternalLink, RefreshCw, Search, Landmark, Rocket, Building2, Apple, Sparkles, User, CircleDollarSign, CalendarClock, ShieldCheck, AlertCircle } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { MASTER_PROMPT } from '@/lib/constants';
@@ -33,6 +33,7 @@ type SourceState = {
     items: FeedItem[];
     loading: boolean;
     fetched: boolean;
+    error: string | null;
 };
 
 const TABS = [
@@ -46,11 +47,11 @@ const TABS = [
 
 export default function Dashboard() {
   const [dataStore, setDataStore] = useState<Record<string, SourceState>>({
-    '정책브리핑': { items: [], loading: false, fetched: false },
-    'K-Startup': { items: [], loading: false, fetched: false },
-    '보조금24': { items: [], loading: false, fetched: false },
-    '중기부/소진공': { items: [], loading: false, fetched: false },
-    '경기/화성비즈': { items: [], loading: false, fetched: false },
+    '정책브리핑': { items: [], loading: false, fetched: false, error: null },
+    'K-Startup': { items: [], loading: false, fetched: false, error: null },
+    '보조금24': { items: [], loading: false, fetched: false, error: null },
+    '중기부/소진공': { items: [], loading: false, fetched: false, error: null },
+    '경기/화성비즈': { items: [], loading: false, fetched: false, error: null },
   });
 
   const [activeTab, setActiveTab] = useState('정책브리핑');
@@ -63,41 +64,52 @@ export default function Dashboard() {
   }, []);
 
   const fetchSource = useCallback(async (sourceId: string, isManual = false) => {
-    // 이미 가져온 데이터가 있고 수동 갱신이 아니면 패스
     if (!isManual && dataStore[sourceId]?.fetched) return;
 
     setDataStore(prev => ({
         ...prev,
-        [sourceId]: { ...prev[sourceId], loading: true }
+        [sourceId]: { ...prev[sourceId], loading: true, error: null }
     }));
 
-    if (isManual) showToast(`🔃 ${sourceId} 신규 100건을 수집 중입니다...`);
+    if (isManual) showToast(`🔃 ${sourceId} 데이터를 실시간 수집 중입니다...`);
 
     try {
       const res = await fetch(`/api/data?source=${encodeURIComponent(sourceId)}&t=${Date.now()}`, { cache: 'no-store' });
       const json = await res.json();
       
       if (json.success && json.data) {
+          const items = json.data || [];
           setDataStore(prev => ({
               ...prev,
-              [sourceId]: { items: json.data, fetched: true, loading: false }
+              [sourceId]: { 
+                items: items, 
+                fetched: true, 
+                loading: false, 
+                error: items.length === 0 ? '데이터 수집 실패 (사이트 보안 차단 또는 공고 없음)' : null 
+              }
           }));
-          if (isManual) showToast(`✅ ${sourceId} 100건 업데이트 완료!`);
+          if (isManual && items.length > 0) showToast(`✅ ${sourceId} ${items.length}건 수집 완료!`);
       } else {
-          showToast(`⚠️ ${sourceId} 수집 실패 (재시도 중)`);
-          setDataStore(prev => ({ ...prev, [sourceId]: { ...prev[sourceId], loading: false } }));
+          setDataStore(prev => ({ 
+            ...prev, 
+            [sourceId]: { ...prev[sourceId], loading: false, error: '데이터 수보 중 에러 발생' } 
+          }));
       }
-    } catch (e) {
+    } catch (e: any) {
+      setDataStore(prev => ({ 
+        ...prev, 
+        [sourceId]: { ...prev[sourceId], loading: false, error: '서버 연결 실패' } 
+      }));
+    } finally {
+      // 무한 로딩 방지를 위해 반드시 실행
       setDataStore(prev => ({ ...prev, [sourceId]: { ...prev[sourceId], loading: false } }));
     }
   }, [dataStore, showToast]);
 
-  // 첫 진입 시 정책브리핑 로드
   useEffect(() => {
     fetchSource('정책브리핑');
   }, []);
 
-  // 탭 변경 시 해당 소스 로드 (Lazy Loading)
   useEffect(() => {
     if (activeTab !== '알맹이') {
         fetchSource(activeTab);
@@ -114,7 +126,6 @@ export default function Dashboard() {
     let result: FeedItem[] = [];
 
     if (activeTab === '알맹이') {
-      // 알맹이 탭: 이미 로드된 모든 탭의 데이터 중 알맹이가 있는 것을 통합
       const allFetchedItems = Object.values(dataStore).flatMap(s => s.items);
       result = allFetchedItems.filter(item => 
         item.almaengi && (
@@ -123,8 +134,7 @@ export default function Dashboard() {
         )
       ).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 100);
     } else {
-      // 탭별 무조건 100건 보존
-      result = dataStore[activeTab]?.items || [];
+      result = (dataStore[activeTab]?.items || []).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     }
 
     if (searchQuery.trim() !== '') {
@@ -140,6 +150,7 @@ export default function Dashboard() {
   }, [dataStore, activeTab, searchQuery]);
 
   const isLoading = dataStore[activeTab]?.loading || false;
+  const currentError = dataStore[activeTab]?.error || null;
 
   return (
     <div className="max-w-7xl mx-auto px-3 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
@@ -148,10 +159,10 @@ export default function Dashboard() {
       <div className="flex flex-col gap-4 mb-6 sm:flex-row sm:items-center sm:justify-between sm:mb-10">
         <div>
           <h1 className="text-2xl font-black tracking-tight text-gray-900 dark:text-white sm:text-4xl">
-            하이엔드 정책 모니터링 v4
+            공식 정책 실시간 수집 센터
           </h1>
           <p className="text-sm text-gray-500 mt-1 dark:text-gray-400 font-bold sm:text-lg">
-            각 탭별 독립 100건 수집 (Lazy Loading 적용)
+            내부 API 연동 기반 정밀 모니터링 (v5)
           </p>
         </div>
 
@@ -161,7 +172,7 @@ export default function Dashboard() {
           className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3.5 rounded-2xl text-base font-black transition-all active:scale-95 disabled:opacity-50 shadow-xl shadow-indigo-500/20"
         >
           <RefreshCw className={cn("w-5 h-5", isLoading && "animate-spin")} />
-          <span>{isLoading ? '수집 중...' : `${activeTab} 100건 갱신`}</span>
+          <span>{isLoading ? '데이터 수집 중...' : `${activeTab} 재수집 시도`}</span>
         </button>
       </div>
 
@@ -172,6 +183,8 @@ export default function Dashboard() {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
             const isFetched = dataStore[tab.id]?.fetched;
+            const hasError = dataStore[tab.id]?.error;
+
             return (
               <button
                 key={tab.id}
@@ -185,8 +198,11 @@ export default function Dashboard() {
               >
                 <Icon className={cn("w-5 h-5", isActive ? "" : tab.color)} />
                 {tab.label}
-                {isFetched && !isActive && (
-                    <span className="absolute -top-1 -right-1 w-3 h-3 bg-indigo-500 rounded-full border-2 border-white dark:border-gray-800" />
+                {isFetched && !isActive && !hasError && (
+                    <span className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white dark:border-gray-800" />
+                )}
+                {hasError && !isActive && (
+                    <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white dark:border-gray-800" />
                 )}
               </button>
             );
@@ -202,7 +218,7 @@ export default function Dashboard() {
         <input
           type="text"
           className="block w-full pl-14 pr-6 py-5 border-2 border-gray-100 dark:border-gray-700 rounded-3xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 text-lg shadow-sm transition-all font-bold"
-          placeholder={`${activeTab} 100건 내 키워드 검색...`}
+          placeholder={`${activeTab} 데이터에서 검색...`}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
         />
@@ -219,12 +235,27 @@ export default function Dashboard() {
             </div>
           ))}
         </div>
+      ) : currentError ? (
+        <div className="text-center py-24 bg-red-50 dark:bg-red-900/10 rounded-[3rem] border-2 border-red-100 dark:border-red-900/30 flex flex-col items-center gap-4">
+          <AlertCircle className="w-16 h-16 text-red-500" />
+          <h2 className="text-xl font-black text-red-600 dark:text-red-400">
+             {currentError}
+          </h2>
+          <p className="text-gray-500 max-w-md mx-auto font-medium">
+            정부 사이트의 보안 강화로 인해 일시적으로 접속이 차단되었거나 수집 경로가 변경되었을 수 있습니다. 잠시 후 [재수집] 버튼을 눌러주세요.
+          </p>
+          <button 
+            onClick={() => fetchSource(activeTab, true)} 
+            className="mt-4 px-8 py-3 bg-red-600 text-white rounded-2xl font-black hover:bg-red-700 transition-all active:scale-95"
+          >
+            지금 다시 시도
+          </button>
+        </div>
       ) : filteredItems.length === 0 ? (
         <div className="text-center py-32 bg-gray-50 dark:bg-gray-900/50 rounded-3xl border-2 border-dashed border-gray-200 dark:border-gray-700">
           <p className="text-gray-400 dark:text-gray-500 font-black text-xl">
-             {activeTab} 정보를 불러오는 중입니다...
+             수집된 데이터가 없습니다.
           </p>
-          <button onClick={() => fetchSource(activeTab, true)} className="mt-4 text-indigo-600 font-bold">수동 강제 수집 시도</button>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 items-start">
