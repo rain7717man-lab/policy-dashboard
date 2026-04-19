@@ -17,30 +17,31 @@ const RSS_SOURCES = [
     name: '중소벤처기업부',
     url: 'https://mss.go.kr/rss/smba/board/85.do',
     category: '사업공고',
-    fallbackUrl: 'https://mss.go.kr/site/smba/ex/board/List.do?cbIdx=86' // RSS 실패 시 크롤링할 페이지
+    fallbackUrl: 'https://mss.go.kr/site/smba/ex/board/List.do?cbIdx=86'
   }
 ];
 
 export const dynamic = 'force-dynamic';
 
-// 중소벤처기업부 직접 크롤링 (RSS 실패 대비)
 async function fetchMssFallback(): Promise<any[]> {
     try {
         const res = await fetch('https://mss.go.kr/site/smba/ex/board/List.do?cbIdx=86', {
-            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36' }
+            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' },
+            signal: AbortSignal.timeout(5000)
         });
         const html = await res.text();
         const $ = cheerio.load(html);
         const items: any[] = [];
         
-        $('.table_style01 tbody tr').each((_, el) => {
+        $('.table_style01 tbody tr').each((i, el) => {
+            if (i >= 20) return; // 상위 20개만 수집
             const title = $(el).find('.txt_left a').text().trim();
             const link = $(el).find('.txt_left a').attr('href');
             const date = $(el).find('td').eq(4).text().trim();
             
             if (title) {
                 items.push({
-                    id: `mss-${title}`,
+                    id: `mss-crawl-${title}`,
                     ministry: '중소벤처기업부',
                     category: '사업공고',
                     title,
@@ -54,7 +55,6 @@ async function fetchMssFallback(): Promise<any[]> {
         });
         return items;
     } catch (e) {
-        console.error('MSS Fallback error:', e);
         return [];
     }
 }
@@ -65,10 +65,9 @@ export async function GET() {
       try {
         const res = await fetch(source.url, {
           next: { revalidate: 0 },
-          signal: AbortSignal.timeout(8000), // 8초 타임아웃
+          signal: AbortSignal.timeout(10000), // 10초 타임아웃
           headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'application/rss+xml, application/xml, text/xml, */*'
           }
         });
 
@@ -80,7 +79,8 @@ export async function GET() {
 
         const feed = await parser.parseString(xml);
         
-        return feed.items.map(item => {
+        // 소스별 최대 30개로 제한하여 쏠림 방지
+        return feed.items.slice(0, 30).map(item => {
           let ministry = source.name === '중소벤처기업부' ? '중소벤처기업부' : '기타 부처';
           let title = item.title || '';
           
@@ -123,7 +123,6 @@ export async function GET() {
           };
         });
       } catch (e: any) {
-        console.error(`RSS fetch error for ${source.name}:`, e.message);
         if (source.name === '중소벤처기업부') return await fetchMssFallback();
         return [];
       }
@@ -137,7 +136,6 @@ export async function GET() {
 
     return NextResponse.json({ success: true, count: items.length, data: items });
   } catch (error) {
-    console.error("RSS API Route Error:", error);
     return NextResponse.json({ success: false, data: [] });
   }
 }

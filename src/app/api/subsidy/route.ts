@@ -26,7 +26,7 @@ async function fetchHsbiz(): Promise<SubsidyItem[]> {
   try {
     const res = await axios.post('https://platform.hsbiz.or.kr/api/business/search', {
       page: 1,
-      size: 15,
+      size: 20, // 20개로 제한
       searchText: "",
       sort: "latest"
     }, {
@@ -52,7 +52,6 @@ async function fetchHsbiz(): Promise<SubsidyItem[]> {
       isLocal: true
     }));
   } catch (e) {
-    console.error('Hsbiz fetch error:', e);
     return [];
   }
 }
@@ -67,7 +66,8 @@ async function fetchKStartup(): Promise<SubsidyItem[]> {
         const xml = await res.text();
         const feed = await parser.parseString(xml);
         
-        return feed.items.map(item => ({
+        // 상위 30개로 대폭 제한 (총 300+개 중 최신만)
+        return feed.items.slice(0, 30).map(item => ({
             id: `kstartup-${item.guid || item.link || item.title}`,
             ministry: '중기부/창진원',
             category: '지원사업',
@@ -79,7 +79,6 @@ async function fetchKStartup(): Promise<SubsidyItem[]> {
             isLocal: false
         }));
     } catch (e) {
-        console.error('K-Startup RSS fetch error:', e);
         return [];
     }
 }
@@ -94,7 +93,8 @@ async function fetchBizinfo(): Promise<SubsidyItem[]> {
         const $ = cheerio.load(html);
         const items: SubsidyItem[] = [];
 
-        $('.table_style01 tbody tr').each((_, el) => {
+        $('.table_style01 tbody tr').each((i, el) => {
+            if (i >= 20) return; // 20개 제한
             const title = $(el).find('.txt_left a').text().trim();
             const link = $(el).find('.txt_left a').attr('href');
             const date = $(el).find('td').eq(4).text().trim();
@@ -116,7 +116,6 @@ async function fetchBizinfo(): Promise<SubsidyItem[]> {
         });
         return items;
     } catch (e) {
-        console.error('Bizinfo fetch error:', e);
         return [];
     }
 }
@@ -171,7 +170,6 @@ export async function GET() {
       data: items 
     });
   } catch (error) {
-    console.error("Subsidy Route Error:", error);
     return NextResponse.json({ success: false, data: [] });
   }
 }
