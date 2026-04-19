@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Copy, ExternalLink, RefreshCw, Search } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { MASTER_PROMPT } from '@/lib/constants';
+import { MASTER_PROMPT, SUBSIDY_PROMPT } from '@/lib/constants';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -66,7 +66,13 @@ export default function Dashboard() {
 
   const copyPrompt = () => {
     navigator.clipboard.writeText(MASTER_PROMPT).then(() => {
-      showToast('파이널 에디션 프롬프트가 복사되었습니다! 노트북LM에 PDF와 함께 넣어주세요.');
+      showToast('하이엔드 v2 프롬프트가 복사되었습니다! 노트북LM에 PDF와 함께 넣어주세요.');
+    });
+  };
+
+  const copySubsidyPrompt = () => {
+    navigator.clipboard.writeText(SUBSIDY_PROMPT).then(() => {
+      showToast('🎁 지원사업 전문 프롬프트가 복사되었습니다! 노트북LM에 공고 PDF와 함께 넣어주세요.');
     });
   };
 
@@ -224,6 +230,14 @@ export default function Dashboard() {
                   >
                     <Copy className="w-4 h-4 shrink-0" />
                     📝 원고 작성 프롬프트 복사
+                  </button>
+
+                  <button
+                    onClick={() => copySubsidyPrompt()}
+                    className="w-full flex items-center justify-center gap-2 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold transition-all shadow-md shadow-emerald-500/20 active:scale-[0.97] min-h-[52px]"
+                  >
+                    <Copy className="w-4 h-4 shrink-0" />
+                    🎁 정부지원사업 원고 생성
                   </button>
 
                   <button
