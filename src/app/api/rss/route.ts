@@ -1,10 +1,13 @@
 import { NextResponse } from 'next/server';
 import Parser from 'rss-parser';
+import axios from 'axios';
+import https from 'https';
 
 type CustomFeed = { title: string };
 type CustomItem = { description: string, pubDate: string, contentSnippet?: string, content?: string };
 
 const parser = new Parser<CustomFeed, CustomItem>();
+const httpsAgent = new https.Agent({ rejectUnauthorized: false });
 
 const RSS_SOURCES = [
   {
@@ -26,7 +29,18 @@ export async function GET() {
   try {
     const allItems = await Promise.all(RSS_SOURCES.map(async (source) => {
       try {
-        const feed = await parser.parseURL(source.url);
+        // parser.parseURL 대신 axios.get + parser.parseString 사용 (헤더 및 인증서 처리 가능)
+        const response = await axios.get(source.url, {
+          httpsAgent,
+          timeout: 7000,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Accept': 'application/rss+xml, application/xml, text/xml, */*'
+          }
+        });
+        
+        const feed = await parser.parseString(response.data);
+        
         return feed.items.map(item => {
           let ministry = source.name === '중소벤처기업부' ? '중소벤처기업부' : '기타 부처';
           let title = item.title || '';
@@ -83,7 +97,9 @@ export async function GET() {
 
     // 날짜 기준 최신순 정렬
     items.sort((a, b) => {
-      return new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime();
+      const dateA = new Date(a.date || 0).getTime();
+      const dateB = new Date(b.date || 0).getTime();
+      return dateB - dateA;
     });
 
     return NextResponse.json({ success: true, count: items.length, data: items });
