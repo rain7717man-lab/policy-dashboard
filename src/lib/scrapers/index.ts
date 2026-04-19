@@ -91,11 +91,11 @@ export async function withRetry<T>(fn: () => Promise<T>, retries = 2): Promise<T
 //    press.xml → briefing.xml 순으로 시도
 // ─────────────────────────────────────────────────────────
 export async function scrapeKoreaKr(limit = 100): Promise<FeedItem[]> {
-  // press.xml = 보도자료 전용 공식 RSS (1순위)
+  // pressrelease.xml = 보도자료 전용 공식 RSS (1순위)
   const URLS = [
+    'https://www.korea.kr/rss/pressrelease.xml',
     'https://www.korea.kr/rss/press.xml',
     'https://www.korea.kr/rss/briefing.xml',
-    'https://www.korea.kr/rss/policy.xml',
   ];
 
   for (const url of URLS) {
