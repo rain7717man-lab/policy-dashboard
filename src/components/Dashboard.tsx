@@ -214,7 +214,7 @@ export default function Dashboard() {
       const targetKey = ['보조금24', '중기부/소진공', 'K-Startup', '경기/화성비즈'].find(k => item.category.includes(k) || (item.source && item.source.includes(k))) || '보조금24';
       const dynamicPoint = customPoints[targetKey];
 
-      promptText += `\n\n6. [출처별 특화 강조 포인트] (해당 내용 필수 반영):\n- ${dynamicPoint}`;
+      promptText += `\n\n7. [출처별 특화 강조 포인트] (해당 내용 필수 반영):\n- ${dynamicPoint}`;
     }
 
     navigator.clipboard.writeText(promptText)
