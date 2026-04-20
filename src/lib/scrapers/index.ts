@@ -235,7 +235,7 @@ export async function scrapeGov24(limit = 100): Promise<FeedItem[]> {
 //    응답 구조: response.body.items.item (1건이면 Object, 복수면 Array)
 // ─────────────────────────────────────────────────────────
 async function fetchMSSBiz(limit: number): Promise<any[]> {
-  const url = 'https://apis.data.go.kr/1421000/bizinfo/pblancBsnsService/getPblancBsnsInfoList';
+  const url = 'https://apis.data.go.kr/1421000/bizinfo/pblancBsnsService';
   console.log(`[중기부API] pblancBsnsService 호출... URL: ${url}`);
   try {
     const res = await axiosRetryGet(url, {
@@ -331,44 +331,49 @@ function isGyeonggi(item: FeedItem | any): boolean {
 }
 
 export async function scrapeGyeonggi(limit = 100): Promise<FeedItem[]> {
-  // 중기부 API에서 경기/화성 키워드 포함 공고만 필터
-  const raw = await fetchMSSBiz(200); // 더 많이 가져와서 필터
-  let result = raw
-    .filter(item => isGyeonggi(item))
-    .map(item => mapMSSItem(item, true))
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    .slice(0, limit);
+  try {
+    // 중기부 API에서 경기/화성 키워드 포함 공고만 필터
+    const raw = await fetchMSSBiz(200); // 더 많이 가져와서 필터
+    let result = raw
+      .filter(item => isGyeonggi(item))
+      .map(item => mapMSSItem(item, true))
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, limit);
 
-  // 화성진흥원 API 보충 (결과가 적을 경우)
-  if (result.length < 10) {
-    try {
-      console.log('[화성진흥원] 보충 API 호출...');
-      const res  = await axios.post(
-        'https://platform.hsbiz.or.kr/api/business/search',
-        { page: 1, size: 50, searchText: '', sort: 'latest' },
-        { headers: { ...CHROME_HEADERS, Referer: 'https://platform.hsbiz.or.kr/' }, httpsAgent: http, timeout: 30000 },
-      );
-      const list: any[] = res.data?.content ?? [];
-      console.log(`[화성진흥원] ✅ ${list.length}건 수신`);
-      list.forEach((item: any) => {
-        if (result.length < limit) result.push({
-          id:          `hsbiz-${item.id}`,
-          ministry:    '화성산업진흥원',
-          category:    '경기/화성비즈',
-          title:       item.title ?? '',
-          link:        `https://platform.hsbiz.or.kr/business/view/${item.id}`,
-          date:        toDate(item.endAt ?? item.createdAt),
-          description: '화성시 기업지원 공고입니다.',
-          source:      '화성진흥원',
-          isLocal:     true,
-          almaengi:    extractAlmaengi(item.title ?? '', ''),
+    // 화성진흥원 API 보충 (결과가 적을 경우)
+    if (result.length < 10) {
+      try {
+        console.log('[화성진흥원] 보충 API 호출...');
+        const res  = await axios.post(
+          'https://platform.hsbiz.or.kr/api/business/search',
+          { page: 1, size: 50, searchText: '', sort: 'latest' },
+          { headers: { ...CHROME_HEADERS, Referer: 'https://platform.hsbiz.or.kr/' }, httpsAgent: http, timeout: 30000 },
+        );
+        const list: any[] = res.data?.content ?? [];
+        console.log(`[화성진흥원] ✅ ${list.length}건 수신`);
+        list.forEach((item: any) => {
+          if (result.length < limit) result.push({
+            id:          `hsbiz-${item.id}`,
+            ministry:    '화성산업진흥원',
+            category:    '경기/화성비즈',
+            title:       item.title ?? '',
+            link:        `https://platform.hsbiz.or.kr/business/view/${item.id}`,
+            date:        toDate(item.endAt ?? item.createdAt),
+            description: '화성시 기업지원 공고입니다.',
+            source:      '화성진흥원',
+            isLocal:     true,
+            almaengi:    extractAlmaengi(item.title ?? '', ''),
+          });
         });
-      });
-    } catch (e: any) {
-      console.error(`[화성진흥원] ❌ ${e.response?.status ?? e.message}`);
+      } catch (e: any) {
+        console.error(`[화성진흥원] ❌ ${e.response?.status ?? e.message}`);
+      }
     }
-  }
 
-  console.log(`[경기/화성비즈] 최종 ${result.length}건 렌더링`);
-  return result;
+    console.log(`[경기/화성비즈] 최종 ${result.length}건 렌더링`);
+    return result;
+  } catch (error: any) {
+    console.error(`[경기/화성비즈] ❌ 전체 스크래핑 실패 (서버 뻗음 방지, 빈 배열 반환): ${error.message}`);
+    return [];
+  }
 }
