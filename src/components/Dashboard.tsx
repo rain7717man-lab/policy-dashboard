@@ -50,6 +50,16 @@ const decodeHtml = (str: string) => {
     .replace(/&nbsp;/g, ' ');
 };
 
+const filterDescription = (str: string) => {
+  if (!str) return '';
+  const kws = ['국무총리', '장관', '차관', '주재', '개최', '보도자료', '양성평등위원회', '비상경제본부'];
+  return str.split('\n').map(line => 
+    line.split('. ')
+      .filter(sentence => !kws.some(kw => sentence.includes(kw)))
+      .join('. ')
+  ).filter(line => line.trim().length > 0).join('\n');
+};
+
 export default function Dashboard() {
   const [dataStore, setDataStore] = useState<DataStore>(mkInitial());
   const [activeTab, setActiveTab] = useState('알맹이');
@@ -251,7 +261,17 @@ export default function Dashboard() {
       ) : (
         // 카드 그리드
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 items-start">
-          {filteredItems.map(item => (
+          {filteredItems.map(item => {
+            const rawDesc = decodeHtml(item.description);
+            const cleanDesc = filterDescription(rawDesc).trim();
+            const tagList = Array.from(new Set([
+              '정부지원사업',
+              item.ministry ? item.ministry.replace(/\s+/g, '') : '',
+              activeTab === 'K-Startup' ? 'K_Startup' : '',
+              (item.almaengi?.budget && item.almaengi.budget !== '상세확인') ? '지원금' : '정부정책'
+            ])).filter(Boolean);
+
+            return (
             <article
               key={item.id}
               className="group flex flex-col bg-white dark:bg-gray-800 rounded-[2.5rem] p-7 border-2 border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-2xl hover:border-indigo-200 dark:hover:border-indigo-800 transition-all duration-500 overflow-hidden"
@@ -287,20 +307,15 @@ export default function Dashboard() {
               </div>
 
               {/* 설명 */}
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-6 line-clamp-3 leading-relaxed flex-grow" title={decodeHtml(item.description)}>
-                {decodeHtml(item.description)}
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-6 line-clamp-3 leading-relaxed flex-grow" title={cleanDesc}>
+                {cleanDesc}
               </p>
 
               {/* 하단 영역 (태그 + 버튼) */}
               <div className="mt-auto flex flex-col gap-4">
                 {/* 해시태그 */}
                 <div className="flex flex-wrap gap-1.5">
-                  {Array.from(new Set([
-                    '정부지원사업',
-                    item.ministry ? item.ministry.replace(/\s+/g, '') : '',
-                    activeTab === 'K-Startup' ? 'K_Startup' : '',
-                    (item.almaengi?.budget && item.almaengi.budget !== '상세확인') ? '지원금' : '정부정책'
-                  ])).filter(Boolean).map(tag => (
+                  {tagList.map(tag => (
                     <span key={tag} className="text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-2 py-1 rounded-md">
                       #{tag}
                     </span>
@@ -311,11 +326,11 @@ export default function Dashboard() {
                 <div className="space-y-2.5">
                   <button
                     onClick={() => {
-                      const desc = decodeHtml(item.description).trim();
                       const coreContent = item.almaengi 
-                        ? `대상: ${item.almaengi.target} / 예산: ${item.almaengi.budget} / 마감: ${item.almaengi.deadline}\n${desc}`
-                        : desc;
-                      const text = `📌 [지원사업명] ${decodeHtml(item.title).trim()}\n🏢 [주관기관] ${item.ministry || '소관기관 미상'}\n💡 [핵심내용] ${coreContent}\n🔗 [공식링크] ${item.link}`;
+                        ? `대상: ${item.almaengi.target} / 예산: ${item.almaengi.budget} / 마감: ${item.almaengi.deadline}\n${cleanDesc}`
+                        : cleanDesc;
+                      const tagsString = tagList.map(t => `#${t}`).join(' ');
+                      const text = `📌 [지원사업명] ${decodeHtml(item.title).trim()}\n🏢 [주관기관] ${item.ministry || '소관기관 미상'}\n💡 [핵심내용] ${coreContent}\n🔗 [공식링크] ${item.link}\n🏷️ [해시태그] ${tagsString}`;
                       navigator.clipboard.writeText(text).then(() => showToast('블로그용 텍스트가 복사되었습니다!'));
                     }}
                   className="w-full flex items-center justify-center gap-2 py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-sm active:scale-95 transition-all shadow-lg"
@@ -337,7 +352,8 @@ export default function Dashboard() {
               </div>
             </div>
           </article>
-        ))}
+          );
+        })}
       </div>
       )}
 
