@@ -276,8 +276,34 @@ export default function Dashboard() {
                 {item.description}
               </p>
 
+              {/* 해시태그 */}
+              <div className="flex flex-wrap gap-2 mb-6">
+                {Array.from(new Set([
+                  '정부지원사업',
+                  item.ministry ? item.ministry.replace(/\s+/g, '') : '',
+                  activeTab === 'K-Startup' ? 'K_Startup' : '',
+                  (item.almaengi?.budget && item.almaengi.budget !== '상세확인') ? '지원금' : '정부정책'
+                ])).filter(Boolean).map(tag => (
+                  <span key={tag} className="text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-2.5 py-1 rounded-md border border-indigo-100 dark:border-indigo-800">
+                    #{tag}
+                  </span>
+                ))}
+              </div>
+
               {/* 버튼 */}
               <div className="mt-auto space-y-2.5">
+                <button
+                  onClick={() => {
+                    const coreContent = item.almaengi 
+                      ? `대상: ${item.almaengi.target} / 예산: ${item.almaengi.budget} / 마감: ${item.almaengi.deadline}\n${item.description.trim()}`
+                      : item.description.trim();
+                    const text = `📌 [지원사업명] ${item.title.trim()}\n🏢 [주관기관] ${item.ministry}\n💡 [핵심내용] ${coreContent}\n🔗 [공식링크] ${item.link}`;
+                    navigator.clipboard.writeText(text).then(() => showToast('블로그용 텍스트가 복사되었습니다!'));
+                  }}
+                  className="w-full flex items-center justify-center gap-2 py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-sm active:scale-95 transition-all shadow-lg"
+                >
+                  <Copy className="w-4 h-4" /> 📝 블로그 초안 복사
+                </button>
                 <button
                   onClick={copyPrompt}
                   className="w-full flex items-center justify-center gap-2 py-4 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl font-black text-sm hover:opacity-90 active:scale-95 transition-all shadow-lg"
