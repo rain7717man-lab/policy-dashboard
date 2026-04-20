@@ -201,31 +201,21 @@ export default function Dashboard() {
   }, [activeTab, fetchSource]);
 
   const copySpecificPrompt = useCallback((item: FeedItem) => {
-    if (item.category === '정책브리핑') {
-      navigator.clipboard.writeText(MASTER_PROMPT).then(() => showToast('원고 작성 프롬프트 복사 완료!'));
-      return;
+    let promptText = MASTER_PROMPT;
+
+    if (item.category !== '정책브리핑') {
+      const customPoints: Record<string, string> = {
+        '보조금24': "보조금24: 지원 자격 요건을 일반인이 알기 쉽게 풀어서 설명하고, 어디서(어느 사이트/앱) 신청하는지 구체적인 경로를 강조해 줘.",
+        '중기부/소진공': "중기부/소진공: 바쁜 1인 기업 대표님들을 위해 지원 규모(지원 금액)와 필수 제출 서류 목록을 깔끔한 리스트로 한 번 더 요약해 줘.",
+        'K-Startup': "K-Startup: 자금 지원 외에 공간 제공이나 교육 등 부가 혜택이 있다면 돋보이게 쓰고, 서류 심사 시 가점(우대) 요건을 '합격 꿀팁'처럼 강조해 줘.",
+        '경기/화성비즈': "경기/화성비즈: 지역 특화 사업이므로 '거주지 요건'이나 '사업장 소재지 기준(화성/경기)'을 글 상단에 눈에 띄게 배치하고, 오프라인 접수처를 명확히 적어줘."
+      };
+
+      const targetKey = ['보조금24', '중기부/소진공', 'K-Startup', '경기/화성비즈'].find(k => item.category.includes(k) || (item.source && item.source.includes(k))) || '보조금24';
+      const dynamicPoint = customPoints[targetKey];
+
+      promptText += `\n\n6. [출처별 특화 강조 포인트] (해당 내용 필수 반영):\n- ${dynamicPoint}`;
     }
-
-    const customPoints: Record<string, string> = {
-      '보조금24': "- 보조금24: 지원 자격 요건을 일반인이 알기 쉽게 풀어서 설명하고, 어디서(어느 사이트/앱) 신청하는지 구체적인 경로를 강조해 줘.",
-      '중기부/소진공': "- 중기부/소진공: 바쁜 1인 기업 대표님들을 위해 지원 규모(지원 금액)와 필수 제출 서류 목록을 깔끔한 리스트로 한 번 더 요약해 줘.",
-      'K-Startup': "- K-Startup: 자금 지원 외에 공간 제공이나 교육 등 부가 혜택이 있다면 돋보이게 쓰고, 서류 심사 시 가점(우대) 요건을 '합격 꿀팁'처럼 강조해 줘.",
-      '경기/화성비즈': "- 경기/화성비즈: 지역 특화 사업이므로 '거주지 요건'이나 '사업장 소재지 기준(화성/경기)'을 글 상단에 눈에 띄게 배치하고, 오프라인 접수처를 명확히 적어줘."
-    };
-
-    const targetKey = ['보조금24', '중기부/소진공', 'K-Startup', '경기/화성비즈'].find(k => item.category.includes(k) || (item.source && item.source.includes(k))) || '보조금24';
-    const dynamicPoint = customPoints[targetKey];
-
-    const promptText = `방금 내가 추가한 소스 문서를 바탕으로, 네이버 블로그에 올릴 정보성 포스팅 초안을 작성해 줘.
-[작성 가이드]
-- 타겟 독자: 1인 비즈니스 대표, 소상공인, 예비 창업자
-- 글의 톤앤매너: 어려운 행정 용어를 배제하고, 동네 이웃이 꿀팁을 알려주듯 친절하고 자연스러운 구어체 사용 ("~해요", "~습니다")
-- 필수 포함 내용: 
-  1) 이 지원사업의 핵심 혜택 (얼마를/무엇을 주는지)
-  2) 정확한 지원 대상 (누가 받을 수 있는지)
-  3) 신청 방법 및 마감일
-  4) ${dynamicPoint}
-- 주의사항: 광고성 콜투액션(CTA)이나 딱딱한 기사체는 절대 금지. 가독성을 위해 적절한 소제목과 불릿 포인트(글머리 기호)를 사용해 줘.`;
 
     navigator.clipboard.writeText(promptText)
       .then(() => showToast('🤖 맞춤형 원고 작성 프롬프트 복사 완료!'));
