@@ -163,7 +163,7 @@ export default function Dashboard() {
       </div>
 
       {/* ── 탭 */}
-      <div className="flex overflow-x-auto scrollbar-hide gap-2 pb-3 mb-6 sm:flex-wrap">
+      <div className="flex flex-wrap justify-start gap-2 pb-3 mb-6">
         {TABS.map(tab => {
           const Icon  = tab.icon;
           const isAct = activeTab === tab.id;
@@ -173,7 +173,7 @@ export default function Dashboard() {
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={cn(
-                'relative flex shrink-0 items-center gap-2 px-5 py-3.5 rounded-2xl text-sm font-black border-2 transition-all whitespace-nowrap',
+                'relative flex items-center gap-1.5 md:gap-2 px-3 py-1.5 md:px-5 md:py-3.5 rounded-xl md:rounded-2xl text-xs md:text-sm font-black border-2 transition-all',
                 isAct
                   ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 border-gray-900 dark:border-white shadow-lg scale-105'
                   : 'bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 border-gray-100 dark:border-gray-700 hover:border-gray-300',
