@@ -160,10 +160,16 @@ export async function scrapeKStartup(limit = 100): Promise<FeedItem[]> {
 //    응답 구조: { data: [...], totalCount, ... }
 // ─────────────────────────────────────────────────────────
 export async function scrapeGov24(limit = 100): Promise<FeedItem[]> {
-  const url = `https://api.odcloud.kr/api/gov24/v1/serviceList?page=1&perPage=${limit}&returnType=JSON`;
+  const url = 'https://api.odcloud.kr/api/gov24/v1/serviceList';
   console.log(`[보조금24] gov24 v1 API 호출... URL: ${url}`);
   try {
     const res = await axiosRetryGet(url, {
+      params: {
+        page: 1,
+        perPage: limit,
+        returnType: 'JSON'
+        // serviceKey 속성 완벽하게 삭제 (오직 Authorization 헤더만 사용)
+      },
       headers: {
         ...CHROME_HEADERS,
         'Accept':        'application/json',
@@ -230,7 +236,8 @@ export async function scrapeGov24(limit = 100): Promise<FeedItem[]> {
 // ─────────────────────────────────────────────────────────
 async function fetchMSSBiz(limit: number): Promise<any[]> {
   // ⚠️ params 객체 금지: 이중 인코딩 방지 — URL에 직접 삽입
-  const url = `https://apis.data.go.kr/1421000/pblancBsnsService/getPblancBsnsInfoList?serviceKey=${API_KEY}&pageNo=1&numOfRows=${limit}&dataType=JSON`;
+  // dataType=JSON 에서 type=json 으로 변경 (공공데이터포털 500 에러 방어)
+  const url = `https://apis.data.go.kr/1421000/pblancBsnsService/getPblancBsnsInfoList?serviceKey=${API_KEY}&pageNo=1&numOfRows=${limit}&type=json`;
   console.log(`[중기부API] pblancBsnsService 호출... URL: ${url.replace(API_KEY, 'REDACTED')}`);
   try {
     const res = await axiosRetryGet(url, {
