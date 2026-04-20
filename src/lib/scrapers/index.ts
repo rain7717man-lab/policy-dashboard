@@ -160,8 +160,8 @@ export async function scrapeKStartup(limit = 100): Promise<FeedItem[]> {
 //    응답 구조: { data: [...], totalCount, ... }
 // ─────────────────────────────────────────────────────────
 export async function scrapeGov24(limit = 100): Promise<FeedItem[]> {
-  const url = 'https://api.odcloud.kr/api/gov24/v1/serviceList';
-  console.log(`[보조금24] gov24 v1 API 호출... URL: ${url}`);
+  const url = 'https://api.odcloud.kr/api/gov24/v3/serviceList';
+  console.log(`[보조금24] gov24 v3 API 호출... URL: ${url}`);
   try {
     const res = await axiosRetryGet(url, {
       params: {
@@ -271,7 +271,7 @@ function parseMssXmlItems(xml: string) {
 
 async function fetchMSSBiz(limit: number): Promise<any[]> {
   // ⚠️ 파라미터 충돌(500 에러) 방어를 위해 JSON 옵션 완전히 제거 후 기본 XML 수신
-  const url = `https://apis.data.go.kr/1421000/pblancBsnsService/getPblancBsnsInfoList?serviceKey=${API_KEY}&pageNo=1&numOfRows=${limit}`;
+  const url = `https://apis.data.go.kr/1421000/bizinfo/pblancBsnsService/getPblancBsnsInfoList?serviceKey=${API_KEY}&pageNo=1&numOfRows=${limit}`;
   console.log(`[중기부API] pblancBsnsService 호출(XML)... URL: ${url.replace(API_KEY, 'REDACTED')}`);
   try {
     const res = await axiosRetryGet(url, {
