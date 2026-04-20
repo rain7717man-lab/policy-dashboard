@@ -234,64 +234,39 @@ export async function scrapeGov24(limit = 100): Promise<FeedItem[]> {
 //    https://apis.data.go.kr/1421000/pblancBsnsService/getPblancBsnsInfoList
 //    응답 구조: response.body.items.item (1건이면 Object, 복수면 Array)
 // ─────────────────────────────────────────────────────────
-// =========================================================================
-// 정규식을 활용한 의존성 없는 자체 XML 파서 (Module Not Found 방어)
-// =========================================================================
-function parseMssXmlItems(xml: string) {
-  const items: any[] = [];
-  const itemMatches = xml.match(/<item>([\s\S]*?)<\/item>/g);
-  if (!itemMatches) return items;
-
-  for (const itemXml of itemMatches) {
-    const getValue = (tagName: string) => {
-      const match = itemXml.match(new RegExp(`<${tagName}>([\\s\\S]*?)<\\/${tagName}>`));
-      if (!match) return '';
-      return match[1].replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
-                     .replace(/&amp;/g, '&')
-                     .replace(/&lt;/g, '<')
-                     .replace(/&gt;/g, '>')
-                     .replace(/&quot;/g, '"')
-                     .replace(/&#039;/g, "'")
-                     .trim();
-    };
-    items.push({
-      pblancNm: getValue('pblancNm'),
-      jrsdInsttNm: getValue('jrsdInsttNm'),
-      pblancId: getValue('pblancId'),
-      rceptBgnde: getValue('rceptBgnde'),
-      rceptEndde: getValue('rceptEndde'),
-      bsnsSumryCn: getValue('bsnsSumryCn'),
-      pblancUrl: getValue('pblancUrl'),
-      trgetSeNm: getValue('trgetSeNm'),
-      suprtBdgtAmt: getValue('suprtBdgtAmt'),
-    });
-  }
-  return items;
-}
-
 async function fetchMSSBiz(limit: number): Promise<any[]> {
-  // ⚠️ 파라미터 충돌(500 에러) 방어를 위해 JSON 옵션 완전히 제거 후 기본 XML 수신
-  const url = `https://apis.data.go.kr/1421000/bizinfo/pblancBsnsService/getPblancBsnsInfoList?serviceKey=${API_KEY}&pageNo=1&numOfRows=${limit}`;
-  console.log(`[중기부API] pblancBsnsService 호출(XML)... URL: ${url.replace(API_KEY, 'REDACTED')}`);
+  const url = 'https://apis.data.go.kr/1421000/bizinfo/pblancBsnsService/getPblancBsnsInfoList';
+  console.log(`[중기부API] pblancBsnsService 호출... URL: ${url}`);
   try {
     const res = await axiosRetryGet(url, {
-      headers: { ...CHROME_HEADERS, Accept: 'application/xml, text/xml, */*' },
+      params: {
+        serviceKey: API_KEY,
+        pageNo: 1,
+        numOfRows: limit,
+        dataType: 'json'
+      },
+      headers: { ...CHROME_HEADERS, Accept: 'application/json' },
       httpsAgent: http,
       timeout:    30000,
     });
 
-    const rawStr = typeof res.data === 'string' ? res.data : JSON.stringify(res.data);
-    console.log('[중기부API] RAW Response (first 800):', rawStr.slice(0, 800));
+    const body     = res.data?.response?.body ?? res.data?.body;
+    const rawItems = body?.items?.item ?? body?.items;
 
-    // 의존성 없는 안전한 정규식 XML 파싱 수행
-    const list = parseMssXmlItems(rawStr);
+    if (rawItems === undefined || rawItems === null) {
+      console.error('[중기부API] ❌ API Fetch Error Details:', res.data ?? '데이터 구조 에러');
+      return [];
+    }
 
-    console.log(`[중기부API] ✅ ${list.length}건 정규식 파싱 수신 완료`);
+    const list: any[] = Array.isArray(rawItems)
+      ? rawItems
+      : (rawItems && typeof rawItems === 'object' ? [rawItems] : []);
+
+    console.log(`[중기부API] ✅ ${list.length}건 수신 (총 ${body?.totalCount ?? '?'}건)`);
     return list;
 
   } catch (e: any) {
-    console.error('[중기부API] ❌ API Fetch Error Details:', e.response?.data ?? '데이터 구조 변경됨');
-    console.error('[중기부API] ❌ HTTP Status:', e.response?.status, '| Message:', e.message);
+    console.error('[중기부API] ❌ API Fetch Error Details:', e.response?.data ?? e.message);
     return [];
   }
 }
