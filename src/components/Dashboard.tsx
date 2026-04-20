@@ -38,6 +38,7 @@ const mkInitial = (): DataStore =>
 const decodeHtml = (str: string) => {
   if (!str) return '';
   return str
+    .replace(/<[^>]*>?/gm, '') // HTML 태그 완벽 제거
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
@@ -71,6 +72,12 @@ const filterDescription = (str: string) => {
         const trimmed = sentence.trim();
         if (trimmed.length < 5) return false;
         if (trimmed.match(/(?:은|는|이|가|을|를|과|와|로|으로|에|에서|의|며|고|며,|고,|통해|대해|위해)$/)) return false;
+        
+        // 괄호로 시작하는 부록(참고, 일시, 국정과제 등) 문장 제거
+        if (trimmed.match(/^【.*?】/)) return false;
+        if (trimmed.match(/^\[.*?\]/)) return false;
+        if (trimmed.match(/^\((일시\/장소|참고|기타).*?\)/)) return false;
+
         return true;
       })
       .join('. ')
@@ -139,10 +146,18 @@ export default function Dashboard() {
     }
   }, [showToast]); // dataStore 의존성 제거 → 재호출 루프 차단
 
-  // 최초 마운트 시: 알맹이 탭이 기본이므로 정책브리핑+K-Startup 백그라운드 프리로드
+  // 최초 접속 시 전체 소스 병렬 Fetch
   useEffect(() => {
-    fetchSource('정책브리핑');
-    fetchSource('K-Startup');
+    const fetchAll = async () => {
+      await Promise.all([
+        fetchSource('정책브리핑'),
+        fetchSource('K-Startup'),
+        fetchSource('보조금24'),
+        fetchSource('중기부/소진공'),
+        fetchSource('경기/화성비즈')
+      ]);
+    };
+    fetchAll();
   }, [fetchSource]);
 
   // 탭 전환 시 해당 탭 레이지 로딩 (알맹이 탭은 별도 fetch 불필요)
