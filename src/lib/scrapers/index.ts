@@ -62,6 +62,20 @@ function toDate(raw?: string | null, fallback = '상시'): string {
   return fallback;
 }
 
+/** 최대 3회 자동 재시도 (axios 용) */
+async function axiosRetryGet(url: string, options: any, retries = 3): Promise<any> {
+  try {
+    return await axios.get(url, options);
+  } catch (error: any) {
+    if (retries > 0) {
+      console.warn(`[Auto-Retry] ${retries}번 남음 - 실패 원인: ${error.message}`);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      return axiosRetryGet(url, options, retries - 1);
+    }
+    throw error;
+  }
+}
+
 /** 2회 자동 재시도 */
 export async function withRetry<T>(fn: () => Promise<T>, retries = 2): Promise<T> {
   try { return await fn(); } catch (e: any) {
@@ -78,7 +92,7 @@ export async function scrapeKoreaKr(limit = 100): Promise<FeedItem[]> {
   const RSS_URL = 'https://www.korea.kr/rss/pressrelease.xml';
   console.log(`[정책브리핑] RSS 호출: ${RSS_URL}`);
   // 에러 시 throw -> route.ts retryWithBackoff 자동 재시도
-  const res  = await axios.get(RSS_URL, {
+  const res  = await axiosRetryGet(RSS_URL, {
     headers:    { ...CHROME_HEADERS, Referer: 'https://www.korea.kr/' },
     httpsAgent: http,
     timeout:    20000,
@@ -113,7 +127,7 @@ export async function scrapeKStartup(limit = 100): Promise<FeedItem[]> {
   const url = 'https://www.k-startup.go.kr/web/contents/rss/bizpbanc-ongoing.do';
   try {
     console.log('[K-Startup] RSS 호출...');
-    const res  = await axios.get(url, {
+    const res  = await axiosRetryGet(url, {
       headers: { ...CHROME_HEADERS, Referer: 'https://www.k-startup.go.kr/' },
       httpsAgent: http, timeout: 12000,
     });
@@ -147,13 +161,13 @@ export async function scrapeKStartup(limit = 100): Promise<FeedItem[]> {
 // ─────────────────────────────────────────────────────────
 export async function scrapeGov24(limit = 100): Promise<FeedItem[]> {
   const url = `https://api.odcloud.kr/api/gov24/v1/serviceList?page=1&perPage=${limit}&returnType=JSON`;
-  console.log(`[보조금24] gov24 v1 API 호출... URL: ${url.replace(API_KEY, 'REDACTED')}`);
+  console.log(`[보조금24] gov24 v1 API 호출... URL: ${url}`);
   try {
-    const res = await axios.get(url, {
+    const res = await axiosRetryGet(url, {
       headers: {
         ...CHROME_HEADERS,
         'Accept':        'application/json',
-        'Authorization': `Infuser ${API_KEY}`,  // odcloud 전용 (공백 필수)
+        'Authorization': 'Infuser ' + process.env.DATA_GO_KR_API_KEY,  // odcloud 전용 (공백 필수)
       },
       httpsAgent: http,
       timeout:    20000,
@@ -219,7 +233,7 @@ async function fetchMSSBiz(limit: number): Promise<any[]> {
   const url = `https://apis.data.go.kr/1421000/pblancBsnsService/getPblancBsnsInfoList?serviceKey=${API_KEY}&pageNo=1&numOfRows=${limit}&dataType=JSON`;
   console.log(`[중기부API] pblancBsnsService 호출... URL: ${url.replace(API_KEY, 'REDACTED')}`);
   try {
-    const res = await axios.get(url, {
+    const res = await axiosRetryGet(url, {
       headers: { ...CHROME_HEADERS, Accept: 'application/json' },
       httpsAgent: http,
       timeout:    15000,
