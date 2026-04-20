@@ -74,42 +74,36 @@ export async function withRetry<T>(fn: () => Promise<T>, retries = 2): Promise<T
 // 1. 정책브리핑 (korea.kr) — 보도자료 RSS
 // ─────────────────────────────────────────────────────────
 export async function scrapeKoreaKr(limit = 100): Promise<FeedItem[]> {
-  const URLS = [
-    'https://www.korea.kr/rss/pressrelease.xml',
-    'https://www.korea.kr/rss/press.xml',
-    'https://www.korea.kr/rss/briefing.xml',
-  ];
-
-  for (const url of URLS) {
-    try {
-      console.log(`[정책브리핑] RSS 시도: ${url}`);
-      const res  = await axios.get(url, {
-        headers: { ...CHROME_HEADERS, Referer: 'https://www.korea.kr/' },
-        httpsAgent: http, timeout: 12000,
-      });
-      const feed = await parser.parseString(res.data);
-      if (!feed.items?.length) { console.warn(`[정책브리핑] 빈 피드: ${url}`); continue; }
-
-      console.log(`[정책브리핑] ✅ ${feed.items.length}건 수신 — ${url}`);
-      return feed.items.map(item => ({
-        id:          `korea-${item.guid ?? item.link}`,
-        ministry:    item.title?.match(/\[(.*?)\]/)?.[1] ?? '대한민국 정부',
-        category:    '정책브리핑',
-        title:       (item.title ?? '').replace(/\[.*?\]\s*/, '').trim(),
-        link:        item.link ?? 'https://www.korea.kr',
-        date:        toDate(item.pubDate, ''),
-        description: (item.contentSnippet ?? '').slice(0, 200),
-        source:      '정책브리핑',
-        isLocal:     false,
-        almaengi:    extractAlmaengi(item.title ?? '', item.contentSnippet ?? ''),
-      }))
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-        .slice(0, limit);
-    } catch (e: any) {
-      console.error(`[정책브리핑] ❌ ${url} — ${e.response?.status ?? e.message}`);
-    }
+  // 공식 보도자료 RSS 단일 URL 고정 (엔드포인트 추론 금지)
+  const RSS_URL = 'https://www.korea.kr/rss/pressrelease.xml';
+  console.log(`[정책브리핑] RSS 호출: ${RSS_URL}`);
+  // 에러 시 throw -> route.ts retryWithBackoff 자동 재시도
+  const res  = await axios.get(RSS_URL, {
+    headers:    { ...CHROME_HEADERS, Referer: 'https://www.korea.kr/' },
+    httpsAgent: http,
+    timeout:    20000,
+  });
+  const feed = await parser.parseString(res.data);
+  if (!feed.items?.length) {
+    console.warn('[정책브리핑] 빈 피드 - 재시도 예정');
+    throw new Error('정책브리핑 피드 비어있음');
   }
-  return [];
+  console.log(`[정책브리핑] ${feed.items.length}건 수신`);
+  return feed.items
+    .map(item => ({
+      id:          `korea-${item.guid ?? item.link}`,
+      ministry:    item.title?.match(/\[(.*?)\]/)?.[1] ?? '대한민국 정부',
+      category:    '정책브리핑',
+      title:       (item.title ?? '').replace(/\[.*?\]\s*/, '').trim(),
+      link:        item.link ?? 'https://www.korea.kr',
+      date:        toDate(item.pubDate, ''),
+      description: (item.contentSnippet ?? '').slice(0, 200),
+      source:      '정책브리핑',
+      isLocal:     false,
+      almaengi:    extractAlmaengi(item.title ?? '', item.contentSnippet ?? ''),
+    }))
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .slice(0, limit);
 }
 
 // ─────────────────────────────────────────────────────────
@@ -152,13 +146,17 @@ export async function scrapeKStartup(limit = 100): Promise<FeedItem[]> {
 //    응답 구조: { data: [...], totalCount, ... }
 // ─────────────────────────────────────────────────────────
 export async function scrapeGov24(limit = 100): Promise<FeedItem[]> {
-  const url = `https://api.odcloud.kr/api/gov24/v1/serviceList?page=1&perPage=${limit}&returnType=JSON&serviceKey=${API_KEY}`;
+  const url = `https://api.odcloud.kr/api/gov24/v1/serviceList?page=1&perPage=${limit}&returnType=JSON`;
   console.log(`[보조금24] gov24 v1 API 호출... URL: ${url.replace(API_KEY, 'REDACTED')}`);
   try {
     const res = await axios.get(url, {
-      headers: { ...CHROME_HEADERS, Accept: 'application/json' },
+      headers: {
+        ...CHROME_HEADERS,
+        'Accept':        'application/json',
+        'Authorization': `Infuser ${API_KEY}`,  // odcloud 전용 (공백 필수)
+      },
       httpsAgent: http,
-      timeout:    15000,
+      timeout:    20000,
     });
 
     // ── [원칙4] 원문 응답 항상 로깅 (Vercel 디버깅용)
