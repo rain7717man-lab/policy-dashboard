@@ -50,12 +50,29 @@ const decodeHtml = (str: string) => {
     .replace(/&nbsp;/g, ' ');
 };
 
+const filterTitle = (title: string) => {
+  if (!title) return '';
+  return title
+    .replace(/\[\s*보도자료\s*\]/g, '')
+    .replace(/국무총리\s*주재/g, '')
+    .replace(/장관/g, '')
+    .replace(/차관/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
 const filterDescription = (str: string) => {
   if (!str) return '';
   const kws = ['국무총리', '장관', '차관', '주재', '개최', '보도자료', '양성평등위원회', '비상경제본부'];
   return str.split('\n').map(line => 
     line.split('. ')
-      .filter(sentence => !kws.some(kw => sentence.includes(kw)))
+      .filter(sentence => {
+        if (kws.some(kw => sentence.includes(kw))) return false;
+        const trimmed = sentence.trim();
+        if (trimmed.length < 5) return false;
+        if (trimmed.match(/(?:은|는|이|가|을|를|과|와|로|으로|에|에서|의|며|고|며,|고,|통해|대해|위해)$/)) return false;
+        return true;
+      })
       .join('. ')
   ).filter(line => line.trim().length > 0).join('\n');
 };
@@ -177,14 +194,16 @@ export default function Dashboard() {
             서버사이드 프록시 + 헤더 스푸핑 기반 WAF 우회 (v6)
           </p>
         </div>
-        <button
-          onClick={() => fetchSource(activeTab, true)}
-          disabled={isLoading}
-          className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-2xl font-black text-base transition-all active:scale-95 disabled:opacity-50 shadow-lg"
-        >
-          <RefreshCw className={cn('w-5 h-5', isLoading && 'animate-spin')} />
-          {isLoading ? '수집 중…' : `${activeTab} 재수집`}
-        </button>
+        {activeTab !== '알맹이' && (
+          <button
+            onClick={() => fetchSource(activeTab, true)}
+            disabled={isLoading}
+            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-2xl font-black text-base transition-all active:scale-95 disabled:opacity-50 shadow-lg"
+          >
+            <RefreshCw className={cn('w-5 h-5', isLoading && 'animate-spin')} />
+            {isLoading ? '수집 중…' : `${activeTab} 재수집`}
+          </button>
+        )}
       </div>
 
       {/* ── 탭 */}
@@ -262,6 +281,7 @@ export default function Dashboard() {
         // 카드 그리드
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 items-start">
           {filteredItems.map(item => {
+            const cleanTitle = filterTitle(decodeHtml(item.title));
             const rawDesc = decodeHtml(item.description);
             const cleanDesc = filterDescription(rawDesc).trim();
             const tagList = Array.from(new Set([
@@ -287,8 +307,8 @@ export default function Dashboard() {
               </div>
 
               {/* 제목 */}
-              <h3 className="text-lg font-black text-gray-900 dark:text-white mb-5 line-clamp-2 leading-snug group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors min-h-[3rem]" title={decodeHtml(item.title)}>
-                {decodeHtml(item.title)}
+              <h3 className="text-lg font-black text-gray-900 dark:text-white mb-5 line-clamp-2 leading-snug group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors min-h-[3rem]" title={cleanTitle}>
+                {cleanTitle}
               </h3>
 
               {/* 알맹이 */}
@@ -330,7 +350,7 @@ export default function Dashboard() {
                         ? `대상: ${item.almaengi.target} / 예산: ${item.almaengi.budget} / 마감: ${item.almaengi.deadline}\n${cleanDesc}`
                         : cleanDesc;
                       const tagsString = tagList.map(t => `#${t}`).join(' ');
-                      const text = `📌 [지원사업명] ${decodeHtml(item.title).trim()}\n🏢 [주관기관] ${item.ministry || '소관기관 미상'}\n💡 [핵심내용] ${coreContent}\n🔗 [공식링크] ${item.link}\n🏷️ [해시태그] ${tagsString}`;
+                      const text = `📌 [지원사업명] ${cleanTitle}\n🏢 [주관기관] ${item.ministry || '소관기관 미상'}\n💡 [핵심내용] ${coreContent}\n🔗 [공식링크] ${item.link}\n🏷️ [해시태그] ${tagsString}`;
                       navigator.clipboard.writeText(text).then(() => showToast('블로그용 텍스트가 복사되었습니다!'));
                     }}
                   className="w-full flex items-center justify-center gap-2 py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-sm active:scale-95 transition-all shadow-lg"
