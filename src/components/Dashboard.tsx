@@ -64,24 +64,36 @@ const filterTitle = (title: string) => {
 
 const filterDescription = (str: string) => {
   if (!str) return '';
+  
+  // 1단계: 명시적인 찌꺼기 블록(괄호 등)을 텍스트 전체에서 먼저 정규식으로 도려냄
+  let cleanedStr = str.replace(/[【\[(](일시|장소|관련 국정과제|국정과제|참고|보도자료|문의|안내|기타).*?[】\])]/g, '');
+  
   const kws = ['국무총리', '장관', '차관', '주재', '개최', '보도자료', '양성평등위원회', '비상경제본부'];
-  return str.split('\n').map(line => 
-    line.split('. ')
+  
+  // 2단계: 문장 단위 필터링
+  const resultLines = cleanedStr.split('\n').map(line => {
+    return line.split('. ')
       .filter(sentence => {
         if (kws.some(kw => sentence.includes(kw))) return false;
         const trimmed = sentence.trim();
         if (trimmed.length < 5) return false;
         if (trimmed.match(/(?:은|는|이|가|을|를|과|와|로|으로|에|에서|의|며|고|며,|고,|통해|대해|위해)$/)) return false;
-        
-        // 괄호로 시작하는 부록(참고, 일시, 국정과제 등) 문장 제거
-        if (trimmed.match(/^【.*?】/)) return false;
-        if (trimmed.match(/^\[.*?\]/)) return false;
-        if (trimmed.match(/^\((일시\/장소|참고|기타).*?\)/)) return false;
-
         return true;
       })
-      .join('. ')
-  ).filter(line => line.trim().length > 0).join('\n');
+      .join('. ');
+  }).filter(line => line.trim().length > 0);
+  
+  const finalResult = resultLines.join('\n').trim();
+
+  // 3단계: 너무 빡빡하게 필터링되어 내용이 텅 비게 되었을 경우 안전망 (Fallback)
+  if (finalResult.length === 0) {
+    // 원본에서 최소한의 정보(첫 문장)라도 반드시 반환
+    const originalFirstSentence = str.split(/[.\n]/).find(s => s.trim().length > 5) || str.slice(0, 50);
+    const fallback = originalFirstSentence.trim();
+    return fallback + (fallback.endsWith('.') ? '' : '.');
+  }
+
+  return finalResult;
 };
 
 export default function Dashboard() {
