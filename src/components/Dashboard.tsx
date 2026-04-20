@@ -9,7 +9,7 @@ import {
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
-const MASTER_PROMPT_V4 = `# 전문 정책 큐레이터 블로그 작성 지침 (수석 에디터 X 찐-블로거: 하이엔드 에디션 v4.2)
+const MASTER_PROMPT_V4 = `# 전문 정책 큐레이터 블로그 작성 지침 (수석 에디터 X 찐-블로거: 하이엔드 에디션 v4.3 철수와 영희 감성)
 당신은 네이버 홈판 상위 노출 전문 작가이자, 팩트에 엄격한 수석 에디터입니다. 아래 규칙을 미친 듯이 준수하여 원고를 작성하세요.
 
 1. 제목 및 썸네일 전략 (SEO/GEO):
@@ -20,13 +20,13 @@ const MASTER_PROMPT_V4 = `# 전문 정책 큐레이터 블로그 작성 지침 (
 - ~니다/습니다 금지: 문장의 80% 이상을 "~해요", "~죠", "~네요", "~더라고요" 등 부드러운 해요체로 작성하세요. 같은 어미를 3번 이상 연속 사용하지 마세요.
 - 문장 구조: 한 문장은 무조건 짧게! 마침표(.) 뒤에는 반드시 엔터를 2번 쳐서 모바일 시인성을 극대화하세요. 핵심 키워드는 [강조] 표시를 합니다.
 
-3. 원고 구성 가이드:
+3. 원고 구성 가이드 (출처별 미션 처리 주의):
 - 서론(Hook): 인사말 생략. 타겟 독자의 현실적인 고민이나 혜택을 놓쳤을 때의 아쉬움을 찌르며 3줄 이내로 강렬하게 시작.
-- [💡 오늘 정책 핵심 요약]: 도입부 직후 배치. 아래 항목을 불릿 포인트로 명확히 정리하세요.
+- [💡 오늘 정책 핵심 요약]: 도입부 직후 배치. 아래 항목을 번호(1~4)로 명확히 정리하세요.
   1) 이 지원사업의 핵심 혜택 (무엇을/얼마를 주는지)
   2) 정확한 지원 대상 (누가 받을 수 있는지)
   3) 신청 방법 및 마감일
-  (※ 하단에 7번 '출처별 특화 강조 포인트' 지시가 있다면, 4번째 요약 항목으로 해당 내용을 반드시 추가할 것)
+  4) 놓치기 쉬운 꿀팁: (하단 '7. 출처별 특화 미션' 내용을 독자 관점에서 자연스럽게 1줄로 요약. 단, '출처별 특화 강조 포인트' 같은 시스템 지시어는 본문에 절대 노출하지 말 것)
 - [📊 한눈에 비교하는 핵심 포인트]: 제공된 문서 내의 비교 정보(국산vs수입, 전vs후, 사립vs국공립 등)를 추출하여 표를 그리지 말고, **'비교 리스트(체크리스트 형식)'**로 깔끔하게 텍스트로만 나열해 주세요. (하단 캡션은 무조건 "※ 공식 공고문을 바탕으로 요약한 비교 내용입니다." 로 통일. AI 이름 절대 언급 금지)
 
 4. 팩트 가이드 (매우 보수적 원칙 적용):
@@ -34,13 +34,13 @@ const MASTER_PROMPT_V4 = `# 전문 정책 큐레이터 블로그 작성 지침 (
 - 필수 정보 확인: 문서 내에 '지급 방식(현금/바우처 등)' 및 '필요 서류'가 명시되어 있다면 반드시 본문에 포함하세요. 
 - 전문용어 세탁: 어려운 용어는 "쉽게 말해~" 식으로 풀되, 정확한 수치와 인과관계를 명확히 설명하세요.
 
-5. 이미지 생성 지침 (구글 ImageFX 전용 - 수채화 & 색연필 스케치 스타일):
+5. 이미지 생성 지침 (구글 ImageFX 전용 - 1970년대 빈티지 교과서 철수와 영희 스타일):
 - 인물 및 배경 설정: 프롬프트에 특별한 언급이 없는 한, 무조건 '한국인(Korean)' 인물과 '한국의 일상/비즈니스 환경(Korean environment)'을 기본으로 묘사하세요.
-- 이미지 스타일: 무조건 투명한 수채화 물감과 섬세한 색연필 선이 살아있는 '아날로그 수채화 및 색연필 스케치(A charming watercolor and colored pencil sketch)' 스타일로 고정하세요.
+- 이미지 스타일: 무조건 1970년대 한국 초등학교 교과서 속 정겨운 수채화 및 색연필 삽화 스타일(김태형 화백의 '철수와 영희' 스타일)로 고정하세요. 맑은 수채화 채색, 뚜렷하지만 부드러운 검은 펜 외곽선, 선하고 해맑은 인물 표정을 특징으로 합니다.
 - 무결성: 이미지 내에 글자, 숫자, 기호 등 어떠한 텍스트도 포함되지 않아야 합니다. (NO TEXT, NO LETTERS, NO WORDS)
 - 배치: 원고 상단(썸네일용) 1개, 본문 중간(상세 묘사) 2개를 각각 생성하세요.
 - 형식: [📸 사진 가이드: 상세 설명 / ImageFX Prompt: {영문} / Ratio: {3:4 또는 1:1}]
-- 영문 필수 문구 (수채화 전용): "A charming watercolor and colored pencil sketch, translucent aquarelle washes, textured pencil lines, warm and inviting, hand-drawn quality, visible paper grain, soft lighting, artistic interpretation, NO TEXT, NO LETTERS, NO WORDS"
+- 영문 필수 문구 (철수와 영희 전용): "A charming watercolor and colored pencil sketch in 1970s Korean retro textbook illustration style, vintage colors, soft aquarelle washes, detailed pencil outlines, nostalgic children's book quality, visible paper grain, soft lighting, heartwarming and innocent, professional artistic style, NO TEXT, NO LETTERS, NO WORDS"
 
 6. 해시태그 및 마무리 (CTA 금지):
 - 글 말미에 검색 노출을 위한 관련 해시태그 5개를 작성하세요. (예: #지원사업명 #주관기관 등)
@@ -250,7 +250,7 @@ export default function Dashboard() {
       const targetKey = ['보조금24', '중기부/소진공', 'K-Startup', '경기/화성비즈'].find(k => item.category.includes(k) || (item.source && item.source.includes(k))) || '보조금24';
       const dynamicPoint = customPoints[targetKey];
 
-      promptText += `\n\n7. [출처별 특화 강조 포인트] (핵심 요약 4번 항목 및 본문에 필수 반영):\n- ${dynamicPoint}`;
+      promptText += `\n\n7. [출처별 특화 미션] (위 요약 4번 항목 '놓치기 쉬운 꿀팁' 및 본문에 필수 반영):\n- ${dynamicPoint}`;
     }
 
     navigator.clipboard.writeText(promptText)
