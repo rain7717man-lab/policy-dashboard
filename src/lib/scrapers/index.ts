@@ -149,11 +149,9 @@ export async function scrapeKStartup(limit = 100): Promise<FeedItem[]> {
 // 3. 보조금24 — 공공데이터포털 OpenAPI
 //    행정안전부_대한민국 공공서비스 정보(보조금24)
 //    https://api.odcloud.kr/api/gov24/v1/serviceList
-//    파라미터: page, perPage, returnType=JSON, serviceKey
+//    응답 구조: { data: [...], totalCount, ... }
 // ─────────────────────────────────────────────────────────
 export async function scrapeGov24(limit = 100): Promise<FeedItem[]> {
-  // api.odcloud.kr — gov24 v1 서비스 목록 (행안부 보조금24)
-  // 파라미터: page, perPage, returnType=JSON, serviceKey (이중인코딩 방지: URL 직접삽입)
   const url = `https://api.odcloud.kr/api/gov24/v1/serviceList?page=1&perPage=${limit}&returnType=JSON&serviceKey=${API_KEY}`;
   console.log(`[보조금24] gov24 v1 API 호출... URL: ${url.replace(API_KEY, 'REDACTED')}`);
   try {
@@ -163,35 +161,50 @@ export async function scrapeGov24(limit = 100): Promise<FeedItem[]> {
       timeout:    15000,
     });
 
-    // ── 원문 응답 항상 로깅
+    // ── [원칙4] 원문 응답 항상 로깅 (Vercel 디버깅용)
     const rawStr = typeof res.data === 'string' ? res.data : JSON.stringify(res.data);
-    console.log('[보조금24] RAW Response (first 600):', rawStr.slice(0, 600));
+    console.log('[보조금24] RAW Response (first 800):', rawStr.slice(0, 800));
 
-    // odcloud API 응답 구조: { currentCount, data: [...], matchCount, page, perPage, totalCount }
-    const list: any[] = (res.data?.data ?? []) || [];
+    // ── [원칙1] 옵셔널 체이닝으로 data 배열 안전 추출
+    const rawList = res.data?.data;
+
+    // ── [원칙2] Array / Object 정규화 (1건이면 Object로 오는 버그 방어)
+    const list: any[] = Array.isArray(rawList)
+      ? rawList
+      : (rawList && typeof rawList === 'object' ? [rawList] : []);
+
     if (!list.length) {
-      console.warn('[보조금24] ⚠️ 데이터 없음 — totalCount:', res.data?.totalCount, '| keys:', Object.keys(res.data ?? {}));
+      console.error('[보조금24] API Fetch Error Details:', res.data ?? '데이터 구조 변경됨');
       return [];
     }
-    console.log(`[보조금24] ✅ ${list.length}건 수신 (총 ${res.data?.totalCount}건)`);
+    console.log(`[보조금24] ✅ ${list.length}건 수신 (총 ${res.data?.totalCount ?? '?'}건)`);
 
-    return list.map((item: any) => ({
-      id:          `gov24-${item['서비스ID'] ?? item.svcId ?? Math.random()}`,
-      ministry:    item['소관기관명'] ?? item.orgNm ?? '정부',
-      category:    '보조금24',
-      title:       item['서비스명'] ?? item.svcNm ?? '정부 지원 서비스',
-      link:        item['신청사이트URL'] ?? item['상세조회URL'] ?? 'https://www.gov.kr/portal/rcvfvrSvc/main',
-      date:        toDate(item['수정일시'] ?? item['등록일시'] ?? item['변경일시']),
-      description: (item['서비스요약'] ?? item['서비스내용'] ?? '').slice(0, 200),
-      source:      '보조금24',
-      isLocal:     false,
-      almaengi:    extractAlmaengi(
-        item['서비스명'] ?? '',
-        `${item['지원대상'] ?? ''} ${item['선정기준'] ?? ''} ${item['지원내용'] ?? ''}`,
-      ),
-    })).slice(0, limit);
+    // ── [원칙3] 프론트엔드 규격으로 변환 + 기본값
+    return list.map((item: any): FeedItem => {
+      const title       = String(item?.['서비스명'] ?? item?.svcNm ?? '정부 지원 서비스');
+      const ministry    = String(item?.['소관기관명'] ?? item?.orgNm ?? '정부');
+      const link        = String(item?.['신청사이트URL'] ?? item?.['상세조회URL'] ?? item?.svcUrl ?? 'https://www.gov.kr/portal/rcvfvrSvc/main');
+      const dateStr     = toDate(item?.['수정일시'] ?? item?.['등록일시'] ?? item?.['변경일시']);
+      const desc        = String(item?.['서비스요약'] ?? item?.['서비스내용'] ?? item?.svcSumry ?? '').slice(0, 200);
+      const targetText  = String(item?.['지원대상'] ?? item?.['선정기준'] ?? '');
+      const contentText = String(item?.['지원내용'] ?? '');
+
+      return {
+        id:          `gov24-${item?.['서비스ID'] ?? item?.svcId ?? Math.random()}`,
+        ministry,
+        category:    '보조금24',
+        title,
+        link,
+        date:        dateStr,
+        description: desc,
+        source:      '보조금24',
+        isLocal:     false,
+        almaengi:    extractAlmaengi(title, `${targetText} ${contentText}`),
+      };
+    }).slice(0, limit);
+
   } catch (e: any) {
-    console.error('[보조금24] ❌ Public API Raw Error:', e.response?.data || e);
+    console.error('[보조금24] ❌ API Fetch Error Details:', e.response?.data ?? '데이터 구조 변경됨');
     console.error('[보조금24] ❌ HTTP Status:', e.response?.status, '| Message:', e.message);
     return [];
   }
@@ -199,12 +212,11 @@ export async function scrapeGov24(limit = 100): Promise<FeedItem[]> {
 
 // ─────────────────────────────────────────────────────────
 // 4. 중기부/소진공 — 공공데이터포털 OpenAPI
-//    중소벤처기업부_사업공고서비스 v2
-//    https://apis.data.go.kr/1421000/mssBizService_v2/getbizList_v2
+//    중소벤처기업부_중소기업 지원사업 공고 조회 서비스
+//    https://apis.data.go.kr/1421000/pblancBsnsService/getPblancBsnsInfoList
+//    응답 구조: response.body.items.item (1건이면 Object, 복수면 Array)
 // ─────────────────────────────────────────────────────────
 async function fetchMSSBiz(limit: number): Promise<any[]> {
-  // 중소기업 지원사업 공고 조회 서비스 (사용자가 활용신청·승인받은 실제 API)
-  // https://apis.data.go.kr/1421000/pblancBsnsService/getPblancBsnsInfoList
   // ⚠️ params 객체 금지: 이중 인코딩 방지 — URL에 직접 삽입
   const url = `https://apis.data.go.kr/1421000/pblancBsnsService/getPblancBsnsInfoList?serviceKey=${API_KEY}&pageNo=1&numOfRows=${limit}&dataType=JSON`;
   console.log(`[중기부API] pblancBsnsService 호출... URL: ${url.replace(API_KEY, 'REDACTED')}`);
@@ -215,59 +227,77 @@ async function fetchMSSBiz(limit: number): Promise<any[]> {
       timeout:    15000,
     });
 
-    // ── 원문 응답 항상 로깅
+    // ── [원칙4] 원문 응답 항상 로깅 (Vercel 디버깅용)
     const rawStr = typeof res.data === 'string' ? res.data : JSON.stringify(res.data);
-    console.log('[중기부API] RAW Response (first 600):', rawStr.slice(0, 600));
+    console.log('[중기부API] RAW Response (first 800):', rawStr.slice(0, 800));
 
-    // XML 에러 응답 감지 (401/NoAuthority 등)
-    if (typeof res.data === 'string' && res.data.includes('<OpenAPI_ServiceResponse>')) {
-      console.error('[중기부API] ❌ XML 에러 응답 수신! 전문:', res.data.slice(0, 800));
+    // ── [원칙1] XML 에러 응답 감지 (401/NoAuthority 등)
+    if (typeof res.data === 'string' && (res.data.includes('<OpenAPI_ServiceResponse>') || res.data.startsWith('<'))) {
+      console.error('[중기부API] ❌ API Fetch Error Details:', res.data.slice(0, 800));
       return [];
     }
 
-    // 파싱 경로 다중 fallback
-    const body     = res.data?.response?.body ?? res.data?.body ?? res.data;
-    const rawItems = body?.items?.item ?? body?.items ?? body?.item;
-    if (!rawItems) {
-      console.warn('[중기부API] ⚠️ 응답 구조 이상 (items 없음) — totalCount:', body?.totalCount, '| 전체 body 키:', Object.keys(body ?? {}));
+    // ── [원칙1] 옵셔널 체이닝으로 깊은 경로 안전 추출
+    const body     = res.data?.response?.body ?? res.data?.body;
+    const rawItems = body?.items?.item ?? body?.items;
+
+    if (rawItems === undefined || rawItems === null) {
+      console.error('[중기부API] ❌ API Fetch Error Details:', res.data ?? '데이터 구조 변경됨');
+      console.warn('[중기부API] ⚠️ items 없음 — totalCount:', body?.totalCount, '| body keys:', Object.keys(body ?? {}));
       return [];
     }
-    const list: any[] = (Array.isArray(rawItems) ? rawItems : [rawItems]) || [];
-    console.log(`[중기부API] ✅ ${list.length}건 수신 (총 ${body?.totalCount}건)`);
+
+    // ── [원칙2] 1건이면 Object로 오는 버그 → 무조건 배열 정규화
+    const list: any[] = Array.isArray(rawItems)
+      ? rawItems
+      : (rawItems && typeof rawItems === 'object' ? [rawItems] : []);
+
+    console.log(`[중기부API] ✅ ${list.length}건 수신 (총 ${body?.totalCount ?? '?'}건)`);
     return list;
+
   } catch (e: any) {
-    console.error('[중기부API] ❌ Public API Raw Error:', e.response?.data || e);
+    console.error('[중기부API] ❌ API Fetch Error Details:', e.response?.data ?? '데이터 구조 변경됨');
     console.error('[중기부API] ❌ HTTP Status:', e.response?.status, '| Message:', e.message);
     return [];
   }
 }
 
-
-/** API raw item → FeedItem 변환 */
+// ── [원칙3] pblancBsnsService 실제 필드명 기반 FeedItem 변환 + 기본값
 function mapMSSItem(item: any, isLocal: boolean): FeedItem {
-  const title    = item.pblancNm     ?? item.사업명      ?? item.title ?? '';
-  const ministry = item.jrsdInsttNm  ?? item.소관기관명  ?? item.creator ?? '중기부';
-  const start    = toDate(item.rceptBgnde ?? item.접수시작일 ?? item.pubDate);
-  const end      = toDate(item.rceptEndde ?? item.접수마감일, '상시');
-  const desc     = (item.bsnsSumryCn ?? item.사업개요 ?? item.contentSnippet ?? '').slice(0, 200);
-  const link     = item.pblancUrl    ?? item.detailUrl   ?? item.link ?? 'https://www.bizinfo.go.kr';
-  const budget   = item.suprtLmttAmt ?? item.지원한도액  ?? '';
-  const target   = item.trgtRgnNm    ?? item.지원대상    ?? '';
+  // pblancBsnsService 주요 필드명 (공공데이터포털 명세 기준)
+  // pblancNm: 공고명, jrsdInsttNm: 주관기관명, pblancId: 공고ID
+  // rceptBgnde: 접수시작일, rceptEndde: 접수마감일 (YYYYMMDD)
+  // bsnsSumryCn: 사업개요, pblancUrl: 공고URL
+  // trgetSeNm: 지원대상, suprtBdgtAmt: 지원예산금액
+  const title    = String(item?.pblancNm    ?? item?.사업명     ?? item?.title ?? '공고명 미제공');
+  const ministry = String(item?.jrsdInsttNm ?? item?.소관기관명 ?? item?.creator ?? '중소벤처기업부');
+  const start    = toDate(item?.rceptBgnde  ?? item?.접수시작일 ?? item?.pubDate);
+  const end      = toDate(item?.rceptEndde  ?? item?.접수마감일, '상시');
+  const desc     = String(item?.bsnsSumryCn ?? item?.사업개요   ?? item?.contentSnippet ?? '').slice(0, 200);
+  const link     = String(item?.pblancUrl   ?? item?.detailUrl  ?? item?.link ?? 'https://www.bizinfo.go.kr');
+
+  // 예산: suprtBdgtAmt (지원예산금액), 없으면 텍스트 추출
+  const budgetRaw  = item?.suprtBdgtAmt ?? item?.지원한도액 ?? '';
+  const budget     = budgetRaw ? String(budgetRaw) : extractAlmaengi(title, desc).budget;
+
+  // 대상: trgetSeNm (지원대상구분명), 없으면 텍스트 추출
+  const targetRaw  = item?.trgetSeNm ?? item?.trgtRgnNm ?? item?.지원대상 ?? '';
+  const target     = targetRaw ? String(targetRaw) : extractAlmaengi(title, desc).target;
 
   return {
-    id:          `mss-${item.pblancId ?? item.공고ID ?? title}-${start}`,
+    id:          `mss-${String(item?.pblancId ?? item?.공고ID ?? title).slice(0, 40)}-${start}`,
     ministry,
     category:    isLocal ? '경기/화성비즈' : '중기부/소진공',
     title,
     link,
     date:        start !== '상시' ? start : end,
-    description: desc,
+    description: desc || '공고 내용은 원문을 확인해 주세요.',
     source:      isLocal ? 'egBiz' : '중기부',
     isLocal,
     almaengi: {
-      target:   target || extractAlmaengi(title, desc).target,
-      budget:   budget || extractAlmaengi(title, desc).budget,
-      deadline: end,
+      target:   target   || '상세참조',
+      budget:   budget   || '상세참조',
+      deadline: end      || '공고확인',
     },
   };
 }
