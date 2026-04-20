@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
-  Copy, ExternalLink, RefreshCw, Search,
+  Copy, ExternalLink, RefreshCw, Search, Star,
   Landmark, Rocket, Building2, Apple, Sparkles,
   User, CircleDollarSign, CalendarClock, ShieldCheck, AlertCircle,
 } from 'lucide-react';
@@ -101,6 +101,7 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('알맹이');
   const [searchQuery, setSearchQuery] = useState('');
   const [toast, setToast] = useState({ show: false, msg: '' });
+  const [pinnedIds, setPinnedIds] = useState<Set<string>>(new Set());
 
   // ── fetchingRef: 무한 재호출 방지 (useCallback의 dataStore 의존성 제거)
   const fetchingRef = useRef<Set<string>>(new Set());
@@ -108,6 +109,28 @@ export default function Dashboard() {
   const showToast = useCallback((msg: string) => {
     setToast({ show: true, msg });
     setTimeout(() => setToast({ show: false, msg: '' }), 2500);
+  }, []);
+
+  const togglePin = useCallback((id: string) => {
+    setPinnedIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+        showToast('알맹이 탭에서 찜을 해제했습니다.');
+      } else {
+        newSet.add(id);
+        showToast('✨ 알맹이 탭에 카드를 꽂았습니다!');
+      }
+      localStorage.setItem('pinnedItems', JSON.stringify(Array.from(newSet)));
+      return newSet;
+    });
+  }, [showToast]);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('pinnedItems');
+      if (saved) setPinnedIds(new Set(JSON.parse(saved)));
+    } catch(e) {}
   }, []);
 
   // ── 핵심 fetch 함수 — finally에서 반드시 loading=false 보장
@@ -186,10 +209,17 @@ export default function Dashboard() {
   const filteredItems = useMemo(() => {
     let result: FeedItem[];
     if (activeTab === '알맹이') {
-      result = Object.values(dataStore)
-        .flatMap(s => s.items)
-        .filter(i => i.almaengi && i.almaengi.budget !== '상세참조' && i.almaengi.deadline !== '공고확인')
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      const allItems = Object.values(dataStore).flatMap(s => s.items);
+      const uniqueItems = Array.from(new Map(allItems.map(i => [i.id, i])).values());
+      result = uniqueItems
+        .filter(i => pinnedIds.has(i.id) || (i.almaengi && i.almaengi.budget !== '상세참조' && i.almaengi.deadline !== '공고확인'))
+        .sort((a, b) => {
+          const aPinned = pinnedIds.has(a.id);
+          const bPinned = pinnedIds.has(b.id);
+          if (aPinned && !bPinned) return -1;
+          if (!aPinned && bPinned) return 1;
+          return new Date(b.date).getTime() - new Date(a.date).getTime();
+        })
         .slice(0, 100);
     } else {
       result = [...(dataStore[activeTab]?.items ?? [])]
@@ -202,7 +232,7 @@ export default function Dashboard() {
       i.description.toLowerCase().includes(q) ||
       i.ministry.toLowerCase().includes(q),
     );
-  }, [dataStore, activeTab, searchQuery]);
+  }, [dataStore, activeTab, searchQuery, pinnedIds]);
 
   const isLoading    = dataStore[activeTab]?.loading ?? false;
   const currentError = activeTab !== '알맹이' ? (dataStore[activeTab]?.error ?? null) : null;
@@ -321,16 +351,38 @@ export default function Dashboard() {
             return (
             <article
               key={item.id}
-              className="group flex flex-col bg-white dark:bg-gray-800 rounded-[2.5rem] p-7 border-2 border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-2xl hover:border-indigo-200 dark:hover:border-indigo-800 transition-all duration-500 overflow-hidden"
+              className={cn(
+                "group flex flex-col rounded-[2.5rem] p-7 border-2 shadow-sm hover:shadow-2xl transition-all duration-500 overflow-hidden",
+                pinnedIds.has(item.id)
+                  ? "bg-amber-50/40 dark:bg-amber-900/10 border-amber-200 hover:border-amber-400 dark:border-amber-800/60 dark:hover:border-amber-700"
+                  : "bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 hover:border-indigo-200 dark:hover:border-indigo-800"
+              )}
             >
               {/* 상단 메타 */}
-              <div className="flex items-center justify-between mb-5">
-                <span className="text-xs font-black text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-3 py-1.5 rounded-full">
-                  {item.ministry}
-                </span>
-                <span className="text-xs font-bold text-gray-400 bg-gray-50 dark:bg-gray-900/30 px-3 py-1.5 rounded-lg">
-                  {item.date}
-                </span>
+              <div className="flex items-start justify-between mb-5">
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <span className="text-xs font-black text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-3 py-1.5 rounded-full w-max">
+                    {item.ministry}
+                  </span>
+                  <span className="text-xs font-bold text-gray-400 bg-gray-50 dark:bg-gray-900/30 px-3 py-1.5 rounded-lg w-max">
+                    {item.date}
+                  </span>
+                </div>
+                
+                {/* 찜하기(Pin) 토글 버튼 */}
+                <button
+                  onClick={() => togglePin(item.id)}
+                  className={cn(
+                    "px-3 py-1.5 md:py-2 rounded-xl transition-all shadow-sm active:scale-95 flex items-center gap-1.5 border-2 select-none",
+                    pinnedIds.has(item.id)
+                      ? "bg-amber-100 border-amber-300 text-amber-600 dark:bg-amber-900/50 dark:border-amber-700 dark:text-amber-400"
+                      : "bg-white border-gray-100 text-gray-400 hover:border-gray-200 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:hover:border-gray-600"
+                  )}
+                  title="필터링을 무시하고 알맹이 탭 최상단에 고정합니다."
+                >
+                  <Star className={cn("w-4 h-4", pinnedIds.has(item.id) && "fill-current")} />
+                  <span className="text-xs font-bold hidden sm:inline whitespace-nowrap">{pinnedIds.has(item.id) ? '찜 해제' : '알맹이에 꽂기'}</span>
+                </button>
               </div>
 
               {/* 제목 */}
