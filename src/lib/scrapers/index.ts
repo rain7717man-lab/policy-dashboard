@@ -95,7 +95,7 @@ export async function scrapeKoreaKr(limit = 100): Promise<FeedItem[]> {
   const res  = await axiosRetryGet(RSS_URL, {
     headers:    { ...CHROME_HEADERS, Referer: 'https://www.korea.kr/' },
     httpsAgent: http,
-    timeout:    20000,
+    timeout:    30000,
   });
   const feed = await parser.parseString(res.data);
   if (!feed.items?.length) {
@@ -129,7 +129,7 @@ export async function scrapeKStartup(limit = 100): Promise<FeedItem[]> {
     console.log('[K-Startup] RSS 호출...');
     const res  = await axiosRetryGet(url, {
       headers: { ...CHROME_HEADERS, Referer: 'https://www.k-startup.go.kr/' },
-      httpsAgent: http, timeout: 12000,
+      httpsAgent: http, timeout: 30000,
     });
     const feed = await parser.parseString(res.data);
     console.log(`[K-Startup] ✅ ${feed.items.length}건 수신`);
@@ -176,7 +176,7 @@ export async function scrapeGov24(limit = 100): Promise<FeedItem[]> {
         'Authorization': 'Infuser ' + process.env.DATA_GO_KR_API_KEY,  // odcloud 전용 (공백 필수)
       },
       httpsAgent: http,
-      timeout:    20000,
+      timeout:    30000,
     });
 
     // ── [원칙4] 원문 응답 항상 로깅 (Vercel 디버깅용)
@@ -234,44 +234,59 @@ export async function scrapeGov24(limit = 100): Promise<FeedItem[]> {
 //    https://apis.data.go.kr/1421000/pblancBsnsService/getPblancBsnsInfoList
 //    응답 구조: response.body.items.item (1건이면 Object, 복수면 Array)
 // ─────────────────────────────────────────────────────────
+// =========================================================================
+// 정규식을 활용한 의존성 없는 자체 XML 파서 (Module Not Found 방어)
+// =========================================================================
+function parseMssXmlItems(xml: string) {
+  const items: any[] = [];
+  const itemMatches = xml.match(/<item>([\s\S]*?)<\/item>/g);
+  if (!itemMatches) return items;
+
+  for (const itemXml of itemMatches) {
+    const getValue = (tagName: string) => {
+      const match = itemXml.match(new RegExp(`<${tagName}>([\\s\\S]*?)<\\/${tagName}>`));
+      if (!match) return '';
+      return match[1].replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
+                     .replace(/&amp;/g, '&')
+                     .replace(/&lt;/g, '<')
+                     .replace(/&gt;/g, '>')
+                     .replace(/&quot;/g, '"')
+                     .replace(/&#039;/g, "'")
+                     .trim();
+    };
+    items.push({
+      pblancNm: getValue('pblancNm'),
+      jrsdInsttNm: getValue('jrsdInsttNm'),
+      pblancId: getValue('pblancId'),
+      rceptBgnde: getValue('rceptBgnde'),
+      rceptEndde: getValue('rceptEndde'),
+      bsnsSumryCn: getValue('bsnsSumryCn'),
+      pblancUrl: getValue('pblancUrl'),
+      trgetSeNm: getValue('trgetSeNm'),
+      suprtBdgtAmt: getValue('suprtBdgtAmt'),
+    });
+  }
+  return items;
+}
+
 async function fetchMSSBiz(limit: number): Promise<any[]> {
-  // ⚠️ params 객체 금지: 이중 인코딩 방지 — URL에 직접 삽입
-  // dataType=JSON 에서 type=json 으로 변경 (공공데이터포털 500 에러 방어)
-  const url = `https://apis.data.go.kr/1421000/pblancBsnsService/getPblancBsnsInfoList?serviceKey=${API_KEY}&pageNo=1&numOfRows=${limit}&type=json`;
-  console.log(`[중기부API] pblancBsnsService 호출... URL: ${url.replace(API_KEY, 'REDACTED')}`);
+  // ⚠️ 파라미터 충돌(500 에러) 방어를 위해 JSON 옵션 완전히 제거 후 기본 XML 수신
+  const url = `https://apis.data.go.kr/1421000/pblancBsnsService/getPblancBsnsInfoList?serviceKey=${API_KEY}&pageNo=1&numOfRows=${limit}`;
+  console.log(`[중기부API] pblancBsnsService 호출(XML)... URL: ${url.replace(API_KEY, 'REDACTED')}`);
   try {
     const res = await axiosRetryGet(url, {
-      headers: { ...CHROME_HEADERS, Accept: 'application/json' },
+      headers: { ...CHROME_HEADERS, Accept: 'application/xml, text/xml, */*' },
       httpsAgent: http,
-      timeout:    15000,
+      timeout:    30000,
     });
 
-    // ── [원칙4] 원문 응답 항상 로깅 (Vercel 디버깅용)
     const rawStr = typeof res.data === 'string' ? res.data : JSON.stringify(res.data);
     console.log('[중기부API] RAW Response (first 800):', rawStr.slice(0, 800));
 
-    // ── [원칙1] XML 에러 응답 감지 (401/NoAuthority 등)
-    if (typeof res.data === 'string' && (res.data.includes('<OpenAPI_ServiceResponse>') || res.data.startsWith('<'))) {
-      console.error('[중기부API] ❌ API Fetch Error Details:', res.data.slice(0, 800));
-      return [];
-    }
+    // 의존성 없는 안전한 정규식 XML 파싱 수행
+    const list = parseMssXmlItems(rawStr);
 
-    // ── [원칙1] 옵셔널 체이닝으로 깊은 경로 안전 추출
-    const body     = res.data?.response?.body ?? res.data?.body;
-    const rawItems = body?.items?.item ?? body?.items;
-
-    if (rawItems === undefined || rawItems === null) {
-      console.error('[중기부API] ❌ API Fetch Error Details:', res.data ?? '데이터 구조 변경됨');
-      console.warn('[중기부API] ⚠️ items 없음 — totalCount:', body?.totalCount, '| body keys:', Object.keys(body ?? {}));
-      return [];
-    }
-
-    // ── [원칙2] 1건이면 Object로 오는 버그 → 무조건 배열 정규화
-    const list: any[] = Array.isArray(rawItems)
-      ? rawItems
-      : (rawItems && typeof rawItems === 'object' ? [rawItems] : []);
-
-    console.log(`[중기부API] ✅ ${list.length}건 수신 (총 ${body?.totalCount ?? '?'}건)`);
+    console.log(`[중기부API] ✅ ${list.length}건 정규식 파싱 수신 완료`);
     return list;
 
   } catch (e: any) {
@@ -356,7 +371,7 @@ export async function scrapeGyeonggi(limit = 100): Promise<FeedItem[]> {
       const res  = await axios.post(
         'https://platform.hsbiz.or.kr/api/business/search',
         { page: 1, size: 50, searchText: '', sort: 'latest' },
-        { headers: { ...CHROME_HEADERS, Referer: 'https://platform.hsbiz.or.kr/' }, httpsAgent: http, timeout: 10000 },
+        { headers: { ...CHROME_HEADERS, Referer: 'https://platform.hsbiz.or.kr/' }, httpsAgent: http, timeout: 30000 },
       );
       const list: any[] = res.data?.content ?? [];
       console.log(`[화성진흥원] ✅ ${list.length}건 수신`);
