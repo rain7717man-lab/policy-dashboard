@@ -338,25 +338,45 @@ export default function Dashboard() {
                 {cleanTitle}
               </h3>
 
-              {/* 알맹이 */}
-              <div className="space-y-2.5 mb-6 bg-gray-50 dark:bg-gray-900/40 p-4 rounded-2xl border border-gray-100 dark:border-gray-800">
-                {[
-                  { icon: User,            label: '대상', value: item.almaengi?.target ?? '전체',    cls: 'text-gray-800 dark:text-gray-200' },
-                  { icon: CircleDollarSign, label: '예산', value: item.almaengi?.budget ?? '상세확인', cls: 'text-emerald-600 dark:text-emerald-400' },
-                  { icon: CalendarClock,   label: '마감', value: item.almaengi?.deadline ?? '상시',   cls: 'text-red-600 dark:text-red-400' },
-                ].map(({ icon: Icon, label, value, cls }) => (
-                  <div key={label} className="flex items-center gap-2.5">
-                    <Icon className="w-4 h-4 text-gray-400 shrink-0" />
-                    <span className="w-10 text-xs font-bold text-gray-400 shrink-0">{label}</span>
-                    <span className={cn('text-sm font-black truncate', cls)}>{value}</span>
-                  </div>
-                ))}
-              </div>
+              {/* 상세/신청(알맹이) 수직 영역 */}
+              <div className="flex flex-col gap-4 mb-6 bg-gray-50 dark:bg-gray-900/40 p-5 rounded-2xl border border-gray-100 dark:border-gray-800 text-sm flex-grow">
+                
+                <div>
+                  <h4 className="font-black text-gray-900 dark:text-white mb-1">[📝 주요내용]</h4>
+                  <p className="text-gray-600 dark:text-gray-300 leading-relaxed line-clamp-3" title={cleanDesc}>
+                    {cleanDesc || '상세 공고문 참조'}
+                  </p>
+                </div>
+                
+                <div>
+                  <h4 className="font-black text-indigo-600 dark:text-indigo-400 mb-1">[🎯 지원대상]</h4>
+                  <p className="text-gray-800 dark:text-gray-200 font-medium line-clamp-2">
+                    {item.almaengi?.target && item.almaengi.target !== '해당기업' ? item.almaengi.target : '전체 (세부조건 공고확인)'}
+                  </p>
+                </div>
+                
+                <div>
+                  <h4 className="font-black text-emerald-600 dark:text-emerald-400 mb-1">[💰 지원내용]</h4>
+                  <p className="text-emerald-700 dark:text-emerald-400 font-black">
+                    {item.almaengi?.budget && item.almaengi.budget !== '상세참조' ? item.almaengi.budget : '상세확인'}
+                  </p>
+                </div>
 
-              {/* 설명 */}
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-6 line-clamp-3 leading-relaxed flex-grow" title={cleanDesc}>
-                {cleanDesc}
-              </p>
+                <div>
+                  <h4 className="font-black text-orange-600 dark:text-orange-400 mb-1">[🚀 신청방법]</h4>
+                  <p className="text-gray-800 dark:text-gray-200 font-medium">
+                    {item.almaengi?.deadline && item.almaengi.deadline !== '공고확인' ? `${item.almaengi.deadline} 까지 온/오프라인 신청` : '공식 사이트 참조'}
+                  </p>
+                </div>
+                
+                <div>
+                  <h4 className="font-black text-purple-600 dark:text-purple-400 mb-1">[📞 접수/문의]</h4>
+                  <p className="text-gray-600 dark:text-gray-400 font-medium tracking-tight line-clamp-1">
+                    {item.ministry || '소관기관 문의처 참조'}
+                  </p>
+                </div>
+                
+              </div>
 
               {/* 하단 영역 (태그 + 버튼) */}
               <div className="mt-auto flex flex-col gap-4">
