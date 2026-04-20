@@ -35,6 +35,21 @@ const TABS = [
 const mkInitial = (): DataStore =>
   Object.fromEntries(SOURCE_IDS.map(id => [id, { items: [], loading: false, fetched: false, error: null }]));
 
+const decodeHtml = (str: string) => {
+  if (!str) return '';
+  return str
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#34;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&middot;/g, '·')
+    .replace(/&#183;/g, '·')
+    .replace(/&nbsp;/g, ' ');
+};
+
 export default function Dashboard() {
   const [dataStore, setDataStore] = useState<DataStore>(mkInitial());
   const [activeTab, setActiveTab] = useState('알맹이');
@@ -252,8 +267,8 @@ export default function Dashboard() {
               </div>
 
               {/* 제목 */}
-              <h3 className="text-lg font-black text-gray-900 dark:text-white mb-5 line-clamp-2 leading-snug group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors min-h-[3rem]" title={item.title}>
-                {item.title}
+              <h3 className="text-lg font-black text-gray-900 dark:text-white mb-5 line-clamp-2 leading-snug group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors min-h-[3rem]" title={decodeHtml(item.title)}>
+                {decodeHtml(item.title)}
               </h3>
 
               {/* 알맹이 */}
@@ -272,34 +287,37 @@ export default function Dashboard() {
               </div>
 
               {/* 설명 */}
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-6 line-clamp-3 leading-relaxed flex-grow" title={item.description}>
-                {item.description}
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-6 line-clamp-3 leading-relaxed flex-grow" title={decodeHtml(item.description)}>
+                {decodeHtml(item.description)}
               </p>
 
-              {/* 해시태그 */}
-              <div className="flex flex-wrap gap-2 mb-6">
-                {Array.from(new Set([
-                  '정부지원사업',
-                  item.ministry ? item.ministry.replace(/\s+/g, '') : '',
-                  activeTab === 'K-Startup' ? 'K_Startup' : '',
-                  (item.almaengi?.budget && item.almaengi.budget !== '상세확인') ? '지원금' : '정부정책'
-                ])).filter(Boolean).map(tag => (
-                  <span key={tag} className="text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-2.5 py-1 rounded-md border border-indigo-100 dark:border-indigo-800">
-                    #{tag}
-                  </span>
-                ))}
-              </div>
+              {/* 하단 영역 (태그 + 버튼) */}
+              <div className="mt-auto flex flex-col gap-4">
+                {/* 해시태그 */}
+                <div className="flex flex-wrap gap-1.5">
+                  {Array.from(new Set([
+                    '정부지원사업',
+                    item.ministry ? item.ministry.replace(/\s+/g, '') : '',
+                    activeTab === 'K-Startup' ? 'K_Startup' : '',
+                    (item.almaengi?.budget && item.almaengi.budget !== '상세확인') ? '지원금' : '정부정책'
+                  ])).filter(Boolean).map(tag => (
+                    <span key={tag} className="text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-2 py-1 rounded-md">
+                      #{tag}
+                    </span>
+                  ))}
+                </div>
 
-              {/* 버튼 */}
-              <div className="mt-auto space-y-2.5">
-                <button
-                  onClick={() => {
-                    const coreContent = item.almaengi 
-                      ? `대상: ${item.almaengi.target} / 예산: ${item.almaengi.budget} / 마감: ${item.almaengi.deadline}\n${item.description.trim()}`
-                      : item.description.trim();
-                    const text = `📌 [지원사업명] ${item.title.trim()}\n🏢 [주관기관] ${item.ministry}\n💡 [핵심내용] ${coreContent}\n🔗 [공식링크] ${item.link}`;
-                    navigator.clipboard.writeText(text).then(() => showToast('블로그용 텍스트가 복사되었습니다!'));
-                  }}
+                {/* 버튼 */}
+                <div className="space-y-2.5">
+                  <button
+                    onClick={() => {
+                      const desc = decodeHtml(item.description).trim();
+                      const coreContent = item.almaengi 
+                        ? `대상: ${item.almaengi.target} / 예산: ${item.almaengi.budget} / 마감: ${item.almaengi.deadline}\n${desc}`
+                        : desc;
+                      const text = `📌 [지원사업명] ${decodeHtml(item.title).trim()}\n🏢 [주관기관] ${item.ministry || '소관기관 미상'}\n💡 [핵심내용] ${coreContent}\n🔗 [공식링크] ${item.link}`;
+                      navigator.clipboard.writeText(text).then(() => showToast('블로그용 텍스트가 복사되었습니다!'));
+                    }}
                   className="w-full flex items-center justify-center gap-2 py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-sm active:scale-95 transition-all shadow-lg"
                 >
                   <Copy className="w-4 h-4" /> 📝 블로그 초안 복사
