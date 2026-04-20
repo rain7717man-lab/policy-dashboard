@@ -335,9 +335,10 @@ export default function Dashboard() {
                   <ExternalLink className="w-4 h-4" /> 공식기관 원문 보기
                 </button>
               </div>
-            </article>
-          ))}
-        </div>
+            </div>
+          </article>
+        ))}
+      </div>
       )}
 
       {/* ── Toast */}
