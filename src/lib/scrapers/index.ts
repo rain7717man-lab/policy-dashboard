@@ -147,54 +147,47 @@ export async function scrapeKStartup(limit = 100): Promise<FeedItem[]> {
 
 // ─────────────────────────────────────────────────────────
 // 3. 보조금24 — 공공데이터포털 OpenAPI
-//    행정안전부_대한민국 공공서비스(혜택) 정보
-//    https://apis.data.go.kr/B554287/LocalGovernmentBenefitService
+//    행정안전부_대한민국 공공서비스 정보(보조금24)
+//    https://api.odcloud.kr/api/gov24/v1/serviceList
+//    파라미터: page, perPage, returnType=JSON, serviceKey
 // ─────────────────────────────────────────────────────────
 export async function scrapeGov24(limit = 100): Promise<FeedItem[]> {
-  // ⚠️ params 객체 금지: 이미 인코딩된 API_KEY가 이중 인코딩되어 NoAuthority 에러 발생
-  // 템플릿 리터럴로 URL에 직접 삽입
-  const url = `https://apis.data.go.kr/B554287/LocalGovernmentBenefitService/getLocalGovernmentBenefitList?serviceKey=${API_KEY}&pageNo=1&numOfRows=${limit}&_type=json`;
-  console.log(`[보조금24] 공공데이터포털 OpenAPI 호출... URL: ${url.replace(API_KEY, 'REDACTED')}`);
+  // api.odcloud.kr — gov24 v1 서비스 목록 (행안부 보조금24)
+  // 파라미터: page, perPage, returnType=JSON, serviceKey (이중인코딩 방지: URL 직접삽입)
+  const url = `https://api.odcloud.kr/api/gov24/v1/serviceList?page=1&perPage=${limit}&returnType=JSON&serviceKey=${API_KEY}`;
+  console.log(`[보조금24] gov24 v1 API 호출... URL: ${url.replace(API_KEY, 'REDACTED')}`);
   try {
     const res = await axios.get(url, {
-      headers: CHROME_HEADERS,
+      headers: { ...CHROME_HEADERS, Accept: 'application/json' },
       httpsAgent: http,
       timeout:    15000,
     });
 
-    // ── 원문 응답 항상 로깅 (Vercel 로그에서 에러 코드 확인용)
+    // ── 원문 응답 항상 로깅
     const rawStr = typeof res.data === 'string' ? res.data : JSON.stringify(res.data);
     console.log('[보조금24] RAW Response (first 600):', rawStr.slice(0, 600));
 
-    // XML 에러 응답 감지 (공공데이터 API가 오류 시 XML 반환)
-    if (typeof res.data === 'string' && res.data.includes('<OpenAPI_ServiceResponse>')) {
-      console.error('[보조금24] ❌ XML 에러 응답 수신! 전문:', res.data.slice(0, 800));
+    // odcloud API 응답 구조: { currentCount, data: [...], matchCount, page, perPage, totalCount }
+    const list: any[] = (res.data?.data ?? []) || [];
+    if (!list.length) {
+      console.warn('[보조금24] ⚠️ 데이터 없음 — totalCount:', res.data?.totalCount, '| keys:', Object.keys(res.data ?? {}));
       return [];
     }
-
-    // 파싱 경로: response.body.items.item (일반) 또는 여러 fallback
-    const body  = res.data?.response?.body ?? res.data?.body ?? res.data;
-    const rawItems = body?.items?.item ?? body?.items ?? body?.item;
-    if (!rawItems) {
-      console.warn('[보조금24] ⚠️ 응답 구조 이상 (items 없음) — totalCount:', body?.totalCount, '| 전체 body 키:', Object.keys(body ?? {}));
-      return [];
-    }
-    const list: any[] = (Array.isArray(rawItems) ? rawItems : [rawItems]) || [];
-    console.log(`[보조금24] ✅ ${list.length}건 수신 (총 ${body?.totalCount}건)`);
+    console.log(`[보조금24] ✅ ${list.length}건 수신 (총 ${res.data?.totalCount}건)`);
 
     return list.map((item: any) => ({
-      id:          `gov24-${item.서비스ID ?? item.svcId ?? Math.random()}`,
-      ministry:    item.소관기관명 ?? item.orgNm ?? '정부',
+      id:          `gov24-${item['서비스ID'] ?? item.svcId ?? Math.random()}`,
+      ministry:    item['소관기관명'] ?? item.orgNm ?? '정부',
       category:    '보조금24',
-      title:       item.서비스명 ?? item.svcNm ?? '정부 지원 혜택',
-      link:        item.사이트 ?? item.svcUrl ?? 'https://www.gov.kr/portal/rcvfvrSvc/main',
-      date:        toDate(item.변경일시 ?? item.수정일 ?? item.등록일시),
-      description: (item.서비스요약 ?? item.서비스내용 ?? item.svcSumry ?? '').slice(0, 200),
+      title:       item['서비스명'] ?? item.svcNm ?? '정부 지원 서비스',
+      link:        item['신청사이트URL'] ?? item['상세조회URL'] ?? 'https://www.gov.kr/portal/rcvfvrSvc/main',
+      date:        toDate(item['수정일시'] ?? item['등록일시'] ?? item['변경일시']),
+      description: (item['서비스요약'] ?? item['서비스내용'] ?? '').slice(0, 200),
       source:      '보조금24',
       isLocal:     false,
       almaengi:    extractAlmaengi(
-        item.서비스명 ?? '',
-        `${item.지원대상 ?? ''} ${item.선정기준 ?? ''} ${item.지원내용 ?? ''}`,
+        item['서비스명'] ?? '',
+        `${item['지원대상'] ?? ''} ${item['선정기준'] ?? ''} ${item['지원내용'] ?? ''}`,
       ),
     })).slice(0, limit);
   } catch (e: any) {
@@ -210,12 +203,14 @@ export async function scrapeGov24(limit = 100): Promise<FeedItem[]> {
 //    https://apis.data.go.kr/1421000/mssBizService_v2/getbizList_v2
 // ─────────────────────────────────────────────────────────
 async function fetchMSSBiz(limit: number): Promise<any[]> {
+  // 중소기업 지원사업 공고 조회 서비스 (사용자가 활용신청·승인받은 실제 API)
+  // https://apis.data.go.kr/1421000/pblancBsnsService/getPblancBsnsInfoList
   // ⚠️ params 객체 금지: 이중 인코딩 방지 — URL에 직접 삽입
-  const url = `https://apis.data.go.kr/1421000/mssBizService_v2/getbizList_v2?serviceKey=${API_KEY}&pageNo=1&numOfRows=${limit}&type=json&_type=json`;
-  console.log(`[중기부API] 공공데이터포털 OpenAPI 호출... URL: ${url.replace(API_KEY, 'REDACTED')}`);
+  const url = `https://apis.data.go.kr/1421000/pblancBsnsService/getPblancBsnsInfoList?serviceKey=${API_KEY}&pageNo=1&numOfRows=${limit}&dataType=JSON`;
+  console.log(`[중기부API] pblancBsnsService 호출... URL: ${url.replace(API_KEY, 'REDACTED')}`);
   try {
     const res = await axios.get(url, {
-      headers: CHROME_HEADERS,
+      headers: { ...CHROME_HEADERS, Accept: 'application/json' },
       httpsAgent: http,
       timeout:    15000,
     });
@@ -224,18 +219,18 @@ async function fetchMSSBiz(limit: number): Promise<any[]> {
     const rawStr = typeof res.data === 'string' ? res.data : JSON.stringify(res.data);
     console.log('[중기부API] RAW Response (first 600):', rawStr.slice(0, 600));
 
-    // XML 에러 응답 감지
+    // XML 에러 응답 감지 (401/NoAuthority 등)
     if (typeof res.data === 'string' && res.data.includes('<OpenAPI_ServiceResponse>')) {
       console.error('[중기부API] ❌ XML 에러 응답 수신! 전문:', res.data.slice(0, 800));
-      return fetchBizInfoRSS();
+      return [];
     }
 
     // 파싱 경로 다중 fallback
-    const body  = res.data?.response?.body ?? res.data?.body ?? res.data;
+    const body     = res.data?.response?.body ?? res.data?.body ?? res.data;
     const rawItems = body?.items?.item ?? body?.items ?? body?.item;
     if (!rawItems) {
       console.warn('[중기부API] ⚠️ 응답 구조 이상 (items 없음) — totalCount:', body?.totalCount, '| 전체 body 키:', Object.keys(body ?? {}));
-      return fetchBizInfoRSS();
+      return [];
     }
     const list: any[] = (Array.isArray(rawItems) ? rawItems : [rawItems]) || [];
     console.log(`[중기부API] ✅ ${list.length}건 수신 (총 ${body?.totalCount}건)`);
@@ -243,61 +238,10 @@ async function fetchMSSBiz(limit: number): Promise<any[]> {
   } catch (e: any) {
     console.error('[중기부API] ❌ Public API Raw Error:', e.response?.data || e);
     console.error('[중기부API] ❌ HTTP Status:', e.response?.status, '| Message:', e.message);
-    return fetchBizInfoRSS();
+    return [];
   }
 }
 
-/** 기업마당(bizinfo.go.kr) RSS 폴백 */
-async function fetchBizInfoRSS(): Promise<any[]> {
-  const URLS = [
-    // crtfcKey도 직접 삽입 (이중 인코딩 방지)
-    `https://www.bizinfo.go.kr/uss/rss/bizinfoApi.do?crtfcKey=${API_KEY}&dataType=JSON&numOfRows=100&pageNo=1`,
-    'https://www.bizinfo.go.kr/uss/rss/bizinfoRss.do',
-  ];
-  for (const url of URLS) {
-    try {
-      console.log(`[기업마당] 폴백 시도: ${url.replace(API_KEY, 'REDACTED')}`);
-      const res  = await axios.get(url, { headers: CHROME_HEADERS, httpsAgent: http, timeout: 12000 });
-
-      // 원문 응답 로깅
-      const rawStr2 = typeof res.data === 'string' ? res.data : JSON.stringify(res.data);
-      console.log('[기업마당] RAW Response (first 400):', rawStr2.slice(0, 400));
-
-      // XML 에러 응답 감지
-      if (typeof res.data === 'string' && res.data.includes('<OpenAPI_ServiceResponse>')) {
-        console.error('[기업마당] ❌ XML 에러 응답 수신! 전문:', res.data.slice(0, 800));
-        continue;
-      }
-
-      // JSON 응답인 경우
-      if (res.headers['content-type']?.includes('json') || typeof res.data === 'object') {
-        const list = (res.data?.items ?? res.data?.item ?? res.data?.result ?? []) || [];
-        if (list.length) { console.log(`[기업마당] ✅ JSON ${list.length}건`); return list; }
-      }
-      // RSS XML 응답인 경우
-      try {
-        const feed = await parser.parseString(res.data);
-        if (feed.items.length) {
-          console.log(`[기업마당] ✅ RSS ${feed.items.length}건`);
-          return feed.items.map(i => ({
-            pblancNm:     i.title,
-            jrsdInsttNm:  i.creator ?? '중소기업',
-            rceptBgnde:   i.pubDate,
-            rceptEndde:   null,
-            bsnsSumryCn:  i.contentSnippet,
-            pblancUrl:    i.link,
-          }));
-        }
-      } catch (parseErr: any) {
-        console.warn('[기업마당] RSS 파싱 실패:', parseErr.message);
-      }
-    } catch (e: any) {
-      console.error('[기업마당] ❌ Public API Raw Error:', e.response?.data || e);
-      console.error('[기업마당] ❌ HTTP Status:', e.response?.status, '| Message:', e.message);
-    }
-  }
-  return [];
-}
 
 /** API raw item → FeedItem 변환 */
 function mapMSSItem(item: any, isLocal: boolean): FeedItem {
