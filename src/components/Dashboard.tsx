@@ -259,12 +259,18 @@ export default function Dashboard() {
 
   // ── 필터링 + 정렬 (메모이제이션)
   const filteredItems = useMemo(() => {
+    const EXCLUDE_KEYWORDS = ['어선', '귀어', '어업', '양식', '농촌', '농업'];
+    const isExcluded = (item: FeedItem) => {
+      const fullText = (item.title || '') + ' ' + (item.description || '');
+      return EXCLUDE_KEYWORDS.some(kw => fullText.includes(kw));
+    };
+
     let result: FeedItem[];
     if (activeTab === '알맹이') {
       const allItems = Object.values(dataStore).flatMap(s => s.items);
       const uniqueItems = Array.from(new Map(allItems.map(i => [i.id, i])).values());
       result = uniqueItems
-        .filter(i => pinnedIds.has(i.id) || (i.almaengi && i.almaengi.budget !== '상세참조' && i.almaengi.deadline !== '공고확인'))
+        .filter(i => !isExcluded(i) && (pinnedIds.has(i.id) || (i.almaengi && i.almaengi.budget !== '상세참조' && i.almaengi.deadline !== '공고확인')))
         .sort((a, b) => {
           const aPinned = pinnedIds.has(a.id);
           const bPinned = pinnedIds.has(b.id);
@@ -275,6 +281,7 @@ export default function Dashboard() {
         .slice(0, 100);
     } else {
       result = [...(dataStore[activeTab]?.items ?? [])]
+        .filter(i => !isExcluded(i))
         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     }
     if (!searchQuery.trim()) return result;
