@@ -259,7 +259,11 @@ export default function Dashboard() {
 
   // ── 필터링 + 정렬 (메모이제이션)
   const filteredItems = useMemo(() => {
-    const EXCLUDE_MINISTRIES = ['해양수산부', '농림축산식품부', '농촌진흥청', '산림청'];
+    const EXCLUDE_MINISTRIES = [
+      '해양수산부', '농림축산식품부', '농촌진흥청', '산림청',
+      '통일부', '외교부', '국방부', '병무청', '방위사업청', '검찰청', '대검찰청', '법무부',
+      '경찰청', '해양경찰청', '우주항공청', '원자력안전위원회', '통계청', '인사혁신처'
+    ];
     const EXCLUDE_KEYWORDS = ['어선', '귀어', '어업', '양식', '농기계', '농업'];
 
     const isExcluded = (item: FeedItem) => {
