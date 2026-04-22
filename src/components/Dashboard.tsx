@@ -9,64 +9,63 @@ import {
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
-const MASTER_PROMPT_V4 = `# 전문 정책 큐레이터 블로그 작성 지침 (수석 에디터 X 찐-블로거: 하이엔드 에디션 v4.3 철수와 영희 감성)
+const MASTER_PROMPT_V4 = `# 전문 정책 큐레이터 블로그 작성 지침 (수석 에디터 X 카드뉴스 특화 에디션 v4.4)
 당신은 네이버 홈판 상위 노출 전문 작가이자, 팩트에 엄격한 수석 에디터입니다. 아래 규칙을 미친 듯이 준수하여 원고를 작성하세요.
 
-1. 제목 및 썸네일 전략 (SEO/GEO):
-- 제목: 메인 키워드를 전면에 배치하되, 독자가 받을 수 있는 '구체적인 숫자(최대 지원 금액 등)'를 반드시 포함하여 호기심을 자극하는 25자 이내 킬링 타이틀 딱 1개 생성.
-- 🎨 추천 썸네일 배경 이미지: 생성된 '제목'의 핵심 오브젝트나 상황을 가장 극적으로 묘사하는 이미지 프롬프트를 원고 최상단에 배치하세요. (텍스트는 절대 넣지 말 것)
+1. 제목 전략 (SEO/GEO):
+- 메인 키워드를 전면에 배치하되, 독자가 받을 수 있는 '구체적인 숫자(최대 지원 금액 등)'를 반드시 포함하여 호기심을 자극하는 25자 이내 킬링 타이틀 딱 1개 생성.
 
 2. 말투 및 가독성 (모바일 최적화):
 - ~니다/습니다 금지: 딱딱한 문어체 대신, 친한 이웃에게 정보를 주듯 자연스럽고 깔끔한 '~해요'체를 기본으로 작성하세요.
-- 억지스러운 어미 남발 절대 금지: 기계적으로 "~죠", "~네요", "~더라고요"를 억지로 끼워 넣지 마세요. (예: "할 수 있죠", "제도네요", "하더라고요" 등 어색한 번역투/AI투 표현 절대 금지). 문맥에 맞는 가장 자연스러운 한국어 평상어투로 작성하고, 같은 어미를 3번 이상 연속 사용하지 마세요.
+- 억지스러운 어미 남발 절대 금지: 기계적으로 "~죠", "~네요", "~더라고요"를 억지로 끼워 넣지 마세요. (예: "할 수 있죠", "제도네요" 등 어색한 표현 절대 금지). 문맥에 맞는 가장 자연스러운 한국어 평상어투로 작성하고, 같은 어미를 3번 이상 연속 사용하지 마세요.
 - 문장 구조: 한 문장은 무조건 짧게! 마침표(.) 뒤에는 반드시 엔터를 2번 쳐서 모바일 시인성을 극대화하세요. 핵심 키워드는 [강조] 표시를 합니다.
 
-3. 원고 구성 가이드 (출처별 미션 처리 주의):
+3. 원고 구성 가이드:
 - 서론(Hook): 인사말 생략. 타겟 독자의 현실적인 고민이나 혜택을 놓쳤을 때의 아쉬움을 찌르며 3줄 이내로 강렬하게 시작.
 - [💡 오늘 정책 핵심 요약]: 도입부 직후 배치. 아래 항목을 번호(1~4)로 명확히 정리하세요.
   1) 이 지원사업의 핵심 혜택 (무엇을/얼마를 주는지)
   2) 정확한 지원 대상 (누가 받을 수 있는지)
   3) 신청 방법 및 마감일
-  4) 놓치기 쉬운 꿀팁: (하단 '7. 출처별 특화 미션' 내용을 독자 관점에서 자연스럽게 1줄로 요약. 단, '출처별 특화 강조 포인트' 같은 시스템 지시어는 본문에 절대 노출하지 말 것)
-- [📊 한눈에 비교하는 핵심 포인트]: 제공된 문서 내의 비교 정보(국산vs수입, 전vs후, 사립vs국공립 등)를 추출하여 표를 그리지 말고, **'비교 리스트(체크리스트 형식)'**로 깔끔하게 텍스트로만 나열해 주세요. (하단 캡션은 무조건 "※ 공식 공고문을 바탕으로 요약한 비교 내용입니다." 로 통일. AI 이름 절대 언급 금지)
+  4) 놓치기 쉬운 꿀팁: (하단 '7. 출처별 특화 미션' 내용을 독자 관점에서 자연스럽게 1줄로 요약. 시스템 지시어는 본문에 절대 노출 금지)
+- [📊 한눈에 비교하는 핵심 포인트]: 제공된 문서 내의 비교 정보를 '비교 리스트(체크리스트 형식)'로 깔끔하게 텍스트로만 나열. (캡션: "※ 공식 공고문을 바탕으로 요약한 비교 내용입니다.")
 
-4. 팩트 가이드 (매우 보수적 원칙 적용):
-- 넘겨짚기 및 유추 절대 금지: 문서에 명시되지 않은 연도 기준, 신청 기한, 기관 명칭 등을 AI가 임의로 생성하거나 유추하지 마세요. 오직 제공된 소스에 쓰여 있는 '팩트'만 보수적으로 기록하세요.
-- 필수 정보 확인: 문서 내에 '지급 방식(현금/바우처 등)' 및 '필요 서류'가 명시되어 있다면 반드시 본문에 포함하세요. 
-- 전문용어 세탁: 어려운 용어는 "쉽게 말해~" 식으로 풀되, 정확한 수치와 인과관계를 명확히 설명하세요.
+4. 팩트 가이드 (매우 보수적 원칙 적용 - ★가장 중요):
+- 넘겨짚기 및 유추 절대 금지: 문서를 요약할 때, 명시되지 않은 내용(연도 기준, 기한, 대상자 조건 등)은 절대 유추하거나 넘겨짚지 마세요. 오직 제공된 소스에 쓰여 있는 사실(팩트)만 정확하고 보수적으로 정리하세요.
+- 필수 정보 확인: 문서 내에 '지급 방식(현금/바우처 등)' 및 '필요 서류'가 명시되어 있다면 반드시 본문에 포함하세요. 전문용어는 "쉽게 말해~" 식으로 풀어서 명확히 설명하세요.
 
-5. 이미지 생성 지침 (구글 ImageFX 전용 - 1970년대 빈티지 교과서 철수와 영희 스타일):
-- 인물 및 배경 설정: 프롬프트에 특별한 언급이 없는 한, 무조건 '한국인(Korean)' 인물과 '한국의 일상/비즈니스 환경(Korean environment)'을 기본으로 묘사하세요.
-- 이미지 스타일: 무조건 1970년대 한국 초등학교 교과서 속 정겨운 수채화 및 색연필 삽화 스타일(김태형 화백의 '철수와 영희' 스타일)로 고정하세요. 맑은 수채화 채색, 뚜렷하지만 부드러운 검은 펜 외곽선, 선하고 해맑은 인물 표정을 특징으로 합니다.
-- 무결성: 이미지 내에 글자, 숫자, 기호 등 어떠한 텍스트도 포함되지 않아야 합니다. (NO TEXT, NO LETTERS, NO WORDS)
-- 배치: 원고 상단(썸네일용) 1개, 본문 중간(상세 묘사) 2개를 각각 생성하세요.
-- 형식: [📸 사진 가이드: 상세 설명 / ImageFX Prompt: {영문} / Ratio: {3:4 또는 1:1}]
-- 영문 필수 문구 (철수와 영희 전용): "A charming watercolor and colored pencil sketch in 1970s Korean retro textbook illustration style, vintage colors, soft aquarelle washes, detailed pencil outlines, nostalgic children's book quality, visible paper grain, soft lighting, heartwarming and innocent, professional artistic style, NO TEXT, NO LETTERS, NO WORDS"
+5. 🎨 시각화 자료 (카드뉴스 & 인포그래픽) 대본 기획:
+원고 텍스트 작성이 모두 끝난 후, 독자가 한눈에 볼 수 있도록 이미지 제작용 '대본(텍스트 구성안)'을 맨 아래에 작성해 주세요.
+- [카드뉴스 슬라이드 대본 4장]: 캔바(Canva) 등에 바로 붙여넣을 수 있게 핵심 텍스트만 짧게 요약.
+  * 슬라이드 1 (표지): 훅을 끄는 메인 제목 & 서브 제목
+  * 슬라이드 2 (지원 대상): "누가 받을 수 있나요?" (조건 3줄 요약)
+  * 슬라이드 3 (핵심 혜택): "무엇을 얼마나 주나요?" (지원 내용 3줄 요약)
+  * 슬라이드 4 (신청 방법): "어떻게 신청하나요?" (절차 및 필요 서류 요약)
+- [원페이지 인포그래픽 대본 1장]: 위 4장의 내용을 1장으로 압축하여 스마트폰에 저장하기 좋게 도식화할 수 있는 텍스트 구조(예: 표 형식, 마인드맵 텍스트 등)로 기획해 주세요.
 
 6. 해시태그 및 마무리 (CTA 금지):
-- 글 말미에 검색 노출을 위한 관련 해시태그 5개를 작성하세요. (예: #지원사업명 #주관기관 등)
-- 억지스러운 공유 유도, 좋아요 요청 등 광고성 콜투액션(CTA)은 신뢰도를 떨어뜨리므로 절대 포함하지 마세요.`;
+- 글 말미에 검색 노출을 위한 관련 해시태그 5개를 작성하세요. 억지스러운 공유/좋아요 요청 등 콜투액션(CTA)은 절대 금지합니다.
+`;
 
 function cn(...inputs: ClassValue[]) { return twMerge(clsx(inputs)); }
 
 type Almaengi = { target: string; budget: string; deadline: string };
-type FeedItem  = {
+type FeedItem = {
   id: string; ministry: string; category: string;
   title: string; link: string; date: string; description: string;
   source?: string; isLocal?: boolean; almaengi?: Almaengi;
 };
 type SourceState = { items: FeedItem[]; loading: boolean; fetched: boolean; error: string | null };
-type DataStore   = Record<string, SourceState>;
+type DataStore = Record<string, SourceState>;
 
 const SOURCE_IDS = ['정책브리핑', 'K-Startup', '보조금24', '중기부/소진공', '경기/화성비즈'];
 
 const TABS = [
-  { id: '알맹이',     label: '✨ 상세/신청(알맹이)', icon: Sparkles,  color: 'text-indigo-600' },
-  { id: '정책브리핑',  label: '🏛️ 정책브리핑',   icon: Landmark,   color: 'text-blue-600' },
-  { id: 'K-Startup',  label: '🚀 K-Startup',   icon: Rocket,     color: 'text-orange-600' },
-  { id: '보조금24',    label: '🛡️ 보조금24',     icon: ShieldCheck, color: 'text-emerald-600' },
-  { id: '중기부/소진공', label: '🏢 중기부/소진공', icon: Building2,  color: 'text-purple-600' },
-  { id: '경기/화성비즈', label: '🍎 경기/화성비즈', icon: Apple,      color: 'text-red-600' },
+  { id: '알맹이', label: '✨ 상세/신청(알맹이)', icon: Sparkles, color: 'text-indigo-600' },
+  { id: '정책브리핑', label: '🏛️ 정책브리핑', icon: Landmark, color: 'text-blue-600' },
+  { id: 'K-Startup', label: '🚀 K-Startup', icon: Rocket, color: 'text-orange-600' },
+  { id: '보조금24', label: '🛡️ 보조금24', icon: ShieldCheck, color: 'text-emerald-600' },
+  { id: '중기부/소진공', label: '🏢 중기부/소진공', icon: Building2, color: 'text-purple-600' },
+  { id: '경기/화성비즈', label: '🍎 경기/화성비즈', icon: Apple, color: 'text-red-600' },
 ];
 
 const mkInitial = (): DataStore =>
@@ -101,12 +100,12 @@ const filterTitle = (title: string) => {
 
 const filterDescription = (str: string) => {
   if (!str) return '';
-  
+
   // 1단계: 명시적인 찌꺼기 블록(괄호 등)을 텍스트 전체에서 먼저 정규식으로 도려냄
   let cleanedStr = str.replace(/[【\[(](일시|장소|관련 국정과제|국정과제|참고|보도자료|문의|안내|기타).*?[】\])]/g, '');
-  
+
   const kws = ['국무총리', '장관', '차관', '주재', '개최', '보도자료', '양성평등위원회', '비상경제본부'];
-  
+
   // 2단계: 문장 단위 필터링
   const resultLines = cleanedStr.split('\n').map(line => {
     return line.split('. ')
@@ -119,7 +118,7 @@ const filterDescription = (str: string) => {
       })
       .join('. ');
   }).filter(line => line.trim().length > 0);
-  
+
   const finalResult = resultLines.join('\n').trim();
 
   // 3단계: 너무 빡빡하게 필터링되어 내용이 텅 비게 되었을 경우 안전망 (Fallback)
@@ -167,7 +166,7 @@ export default function Dashboard() {
     try {
       const saved = localStorage.getItem('pinnedItems');
       if (saved) setPinnedIds(new Set(JSON.parse(saved)));
-    } catch(e) {}
+    } catch (e) { }
   }, []);
 
   // ── 핵심 fetch 함수 — finally에서 반드시 loading=false 보장
@@ -192,7 +191,7 @@ export default function Dashboard() {
     if (force) showToast(`🔃 ${sourceId} 데이터 수집 중…`);
 
     try {
-      const res  = await fetch(`/api/data?source=${encodeURIComponent(sourceId)}&t=${Date.now()}`, { cache: 'no-store' });
+      const res = await fetch(`/api/data?source=${encodeURIComponent(sourceId)}&t=${Date.now()}`, { cache: 'no-store' });
       const json = await res.json();
 
       if (json.success) {
@@ -262,11 +261,11 @@ export default function Dashboard() {
   const filteredItems = useMemo(() => {
     const EXCLUDE_MINISTRIES = ['해양수산부', '농림축산식품부', '농촌진흥청', '산림청'];
     const EXCLUDE_KEYWORDS = ['어선', '귀어', '어업', '양식', '농기계', '농업'];
-    
+
     const isExcluded = (item: FeedItem) => {
       const ministry = item.ministry || '';
       if (EXCLUDE_MINISTRIES.some(kw => ministry.includes(kw))) return true;
-      
+
       const fullText = (item.title || '') + ' ' + (item.description || '');
       return EXCLUDE_KEYWORDS.some(kw => fullText.includes(kw));
     };
@@ -299,7 +298,7 @@ export default function Dashboard() {
     );
   }, [dataStore, activeTab, searchQuery, pinnedIds]);
 
-  const isLoading    = dataStore[activeTab]?.loading ?? false;
+  const isLoading = dataStore[activeTab]?.loading ?? false;
   const currentError = activeTab !== '알맹이' ? (dataStore[activeTab]?.error ?? null) : null;
 
   // ────────────────────── RENDER ──────────────────────
@@ -331,9 +330,9 @@ export default function Dashboard() {
       {/* ── 탭 */}
       <div className="flex flex-wrap justify-start gap-2 pb-3 mb-6">
         {TABS.map(tab => {
-          const Icon  = tab.icon;
+          const Icon = tab.icon;
           const isAct = activeTab === tab.id;
-          const st    = dataStore[tab.id];
+          const st = dataStore[tab.id];
           return (
             <button
               key={tab.id}
@@ -414,126 +413,126 @@ export default function Dashboard() {
             ])).filter(Boolean);
 
             return (
-            <article
-              key={item.id}
-              className={cn(
-                "group flex flex-col rounded-[2.5rem] p-7 border-2 shadow-sm hover:shadow-2xl transition-all duration-500 overflow-hidden",
-                pinnedIds.has(item.id)
-                  ? "bg-amber-50/40 dark:bg-amber-900/10 border-amber-200 hover:border-amber-400 dark:border-amber-800/60 dark:hover:border-amber-700"
-                  : "bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 hover:border-indigo-200 dark:hover:border-indigo-800"
-              )}
-            >
-              {/* 상단 메타 */}
-              <div className="flex items-start justify-between mb-5">
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <span className="text-xs font-black text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-3 py-1.5 rounded-full w-max">
-                    {item.ministry}
-                  </span>
-                  <span className="text-xs font-bold text-gray-400 bg-gray-50 dark:bg-gray-900/30 px-3 py-1.5 rounded-lg w-max">
-                    {item.date}
-                  </span>
-                </div>
-                
-                {/* 찜하기(Pin) 토글 버튼 */}
-                <button
-                  onClick={() => togglePin(item.id)}
-                  className={cn(
-                    "px-3 py-1.5 md:py-2 rounded-xl transition-all shadow-sm active:scale-95 flex items-center gap-1.5 border-2 select-none",
-                    pinnedIds.has(item.id)
-                      ? "bg-amber-100 border-amber-300 text-amber-600 dark:bg-amber-900/50 dark:border-amber-700 dark:text-amber-400"
-                      : "bg-white border-gray-100 text-gray-400 hover:border-gray-200 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:hover:border-gray-600"
-                  )}
-                  title="필터링을 무시하고 알맹이 탭 최상단에 고정합니다."
-                >
-                  <Star className={cn("w-4 h-4", pinnedIds.has(item.id) && "fill-current")} />
-                  <span className="text-xs font-bold hidden sm:inline whitespace-nowrap">{pinnedIds.has(item.id) ? '찜 해제' : '알맹이에 꽂기'}</span>
-                </button>
-              </div>
-
-              {/* 제목 */}
-              <h3 className="text-lg font-black text-gray-900 dark:text-white mb-5 line-clamp-2 leading-snug group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors min-h-[3rem]" title={cleanTitle}>
-                {cleanTitle}
-              </h3>
-
-              {/* 상세/신청(알맹이) 수직 영역 */}
-              <div className="flex flex-col gap-4 mb-6 bg-gray-50 dark:bg-gray-900/40 p-5 rounded-2xl border border-gray-100 dark:border-gray-800 text-sm flex-grow">
-                
-                <div>
-                  <h4 className="font-black text-gray-900 dark:text-white mb-1">[📝 주요내용]</h4>
-                  <p className="text-gray-600 dark:text-gray-300 leading-relaxed line-clamp-3" title={cleanDesc}>
-                    {cleanDesc || '상세 공고문 참조'}
-                  </p>
-                </div>
-                
-                <div>
-                  <h4 className="font-black text-indigo-600 dark:text-indigo-400 mb-1">[🎯 지원대상]</h4>
-                  <p className="text-gray-800 dark:text-gray-200 font-medium line-clamp-2">
-                    {item.almaengi?.target && item.almaengi.target !== '해당기업' ? item.almaengi.target : '전체 (세부조건 공고확인)'}
-                  </p>
-                </div>
-                
-                <div>
-                  <h4 className="font-black text-emerald-600 dark:text-emerald-400 mb-1">[💰 지원내용]</h4>
-                  <p className="text-emerald-700 dark:text-emerald-400 font-black">
-                    {item.almaengi?.budget && item.almaengi.budget !== '상세참조' ? item.almaengi.budget : '상세확인'}
-                  </p>
-                </div>
-
-                <div>
-                  <h4 className="font-black text-orange-600 dark:text-orange-400 mb-1">[🚀 신청방법]</h4>
-                  <p className="text-gray-800 dark:text-gray-200 font-medium">
-                    {item.almaengi?.deadline && item.almaengi.deadline !== '공고확인' ? `${item.almaengi.deadline} 까지 온/오프라인 신청` : '공식 사이트 참조'}
-                  </p>
-                </div>
-                
-                <div>
-                  <h4 className="font-black text-purple-600 dark:text-purple-400 mb-1">[📞 접수/문의]</h4>
-                  <p className="text-gray-600 dark:text-gray-400 font-medium tracking-tight line-clamp-1">
-                    {item.ministry || '소관기관 문의처 참조'}
-                  </p>
-                </div>
-                
-              </div>
-
-              {/* 하단 영역 (태그 + 버튼) */}
-              <div className="mt-auto flex flex-col gap-4">
-                {/* 해시태그 */}
-                <div className="flex flex-wrap gap-1.5">
-                  {tagList.map(tag => (
-                    <span key={tag} className="text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-2 py-1 rounded-md">
-                      #{tag}
+              <article
+                key={item.id}
+                className={cn(
+                  "group flex flex-col rounded-[2.5rem] p-7 border-2 shadow-sm hover:shadow-2xl transition-all duration-500 overflow-hidden",
+                  pinnedIds.has(item.id)
+                    ? "bg-amber-50/40 dark:bg-amber-900/10 border-amber-200 hover:border-amber-400 dark:border-amber-800/60 dark:hover:border-amber-700"
+                    : "bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 hover:border-indigo-200 dark:hover:border-indigo-800"
+                )}
+              >
+                {/* 상단 메타 */}
+                <div className="flex items-start justify-between mb-5">
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <span className="text-xs font-black text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-3 py-1.5 rounded-full w-max">
+                      {item.ministry}
                     </span>
-                  ))}
+                    <span className="text-xs font-bold text-gray-400 bg-gray-50 dark:bg-gray-900/30 px-3 py-1.5 rounded-lg w-max">
+                      {item.date}
+                    </span>
+                  </div>
+
+                  {/* 찜하기(Pin) 토글 버튼 */}
+                  <button
+                    onClick={() => togglePin(item.id)}
+                    className={cn(
+                      "px-3 py-1.5 md:py-2 rounded-xl transition-all shadow-sm active:scale-95 flex items-center gap-1.5 border-2 select-none",
+                      pinnedIds.has(item.id)
+                        ? "bg-amber-100 border-amber-300 text-amber-600 dark:bg-amber-900/50 dark:border-amber-700 dark:text-amber-400"
+                        : "bg-white border-gray-100 text-gray-400 hover:border-gray-200 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:hover:border-gray-600"
+                    )}
+                    title="필터링을 무시하고 알맹이 탭 최상단에 고정합니다."
+                  >
+                    <Star className={cn("w-4 h-4", pinnedIds.has(item.id) && "fill-current")} />
+                    <span className="text-xs font-bold hidden sm:inline whitespace-nowrap">{pinnedIds.has(item.id) ? '찜 해제' : '알맹이에 꽂기'}</span>
+                  </button>
                 </div>
 
-                {/* 버튼 */}
-                <div className="space-y-2.5">
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(item.link).then(() => showToast('🔗 원본 링크가 복사되었습니다!'));
-                    }}
-                  className="w-full flex items-center justify-center gap-2 py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-sm active:scale-95 transition-all shadow-lg"
-                >
-                  <Copy className="w-4 h-4" /> 🔗 공식 링크 복사
-                </button>
-                <button
-                  onClick={() => copySpecificPrompt(item)}
-                  className="w-full flex items-center justify-center gap-2 py-4 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl font-black text-sm hover:opacity-90 active:scale-95 transition-all shadow-lg"
-                >
-                  <Copy className="w-4 h-4" /> 🤖 원고 작성 프롬프트 복사
-                </button>
-                <button
-                  onClick={() => window.open(item.link, '_blank')}
-                  className="w-full flex items-center justify-center gap-2 py-3 border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-700/30 text-gray-500 dark:text-gray-300 rounded-xl font-bold text-sm hover:bg-gray-50 dark:hover:bg-gray-600 transition-all"
-                >
-                  <ExternalLink className="w-4 h-4" /> 공식기관 원문 보기
-                </button>
-              </div>
-            </div>
-          </article>
-          );
-        })}
-      </div>
+                {/* 제목 */}
+                <h3 className="text-lg font-black text-gray-900 dark:text-white mb-5 line-clamp-2 leading-snug group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors min-h-[3rem]" title={cleanTitle}>
+                  {cleanTitle}
+                </h3>
+
+                {/* 상세/신청(알맹이) 수직 영역 */}
+                <div className="flex flex-col gap-4 mb-6 bg-gray-50 dark:bg-gray-900/40 p-5 rounded-2xl border border-gray-100 dark:border-gray-800 text-sm flex-grow">
+
+                  <div>
+                    <h4 className="font-black text-gray-900 dark:text-white mb-1">[📝 주요내용]</h4>
+                    <p className="text-gray-600 dark:text-gray-300 leading-relaxed line-clamp-3" title={cleanDesc}>
+                      {cleanDesc || '상세 공고문 참조'}
+                    </p>
+                  </div>
+
+                  <div>
+                    <h4 className="font-black text-indigo-600 dark:text-indigo-400 mb-1">[🎯 지원대상]</h4>
+                    <p className="text-gray-800 dark:text-gray-200 font-medium line-clamp-2">
+                      {item.almaengi?.target && item.almaengi.target !== '해당기업' ? item.almaengi.target : '전체 (세부조건 공고확인)'}
+                    </p>
+                  </div>
+
+                  <div>
+                    <h4 className="font-black text-emerald-600 dark:text-emerald-400 mb-1">[💰 지원내용]</h4>
+                    <p className="text-emerald-700 dark:text-emerald-400 font-black">
+                      {item.almaengi?.budget && item.almaengi.budget !== '상세참조' ? item.almaengi.budget : '상세확인'}
+                    </p>
+                  </div>
+
+                  <div>
+                    <h4 className="font-black text-orange-600 dark:text-orange-400 mb-1">[🚀 신청방법]</h4>
+                    <p className="text-gray-800 dark:text-gray-200 font-medium">
+                      {item.almaengi?.deadline && item.almaengi.deadline !== '공고확인' ? `${item.almaengi.deadline} 까지 온/오프라인 신청` : '공식 사이트 참조'}
+                    </p>
+                  </div>
+
+                  <div>
+                    <h4 className="font-black text-purple-600 dark:text-purple-400 mb-1">[📞 접수/문의]</h4>
+                    <p className="text-gray-600 dark:text-gray-400 font-medium tracking-tight line-clamp-1">
+                      {item.ministry || '소관기관 문의처 참조'}
+                    </p>
+                  </div>
+
+                </div>
+
+                {/* 하단 영역 (태그 + 버튼) */}
+                <div className="mt-auto flex flex-col gap-4">
+                  {/* 해시태그 */}
+                  <div className="flex flex-wrap gap-1.5">
+                    {tagList.map(tag => (
+                      <span key={tag} className="text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-2 py-1 rounded-md">
+                        #{tag}
+                      </span>
+                    ))}
+                  </div>
+
+                  {/* 버튼 */}
+                  <div className="space-y-2.5">
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(item.link).then(() => showToast('🔗 원본 링크가 복사되었습니다!'));
+                      }}
+                      className="w-full flex items-center justify-center gap-2 py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-sm active:scale-95 transition-all shadow-lg"
+                    >
+                      <Copy className="w-4 h-4" /> 🔗 공식 링크 복사
+                    </button>
+                    <button
+                      onClick={() => copySpecificPrompt(item)}
+                      className="w-full flex items-center justify-center gap-2 py-4 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl font-black text-sm hover:opacity-90 active:scale-95 transition-all shadow-lg"
+                    >
+                      <Copy className="w-4 h-4" /> 🤖 원고 작성 프롬프트 복사
+                    </button>
+                    <button
+                      onClick={() => window.open(item.link, '_blank')}
+                      className="w-full flex items-center justify-center gap-2 py-3 border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-700/30 text-gray-500 dark:text-gray-300 rounded-xl font-bold text-sm hover:bg-gray-50 dark:hover:bg-gray-600 transition-all"
+                    >
+                      <ExternalLink className="w-4 h-4" /> 공식기관 원문 보기
+                    </button>
+                  </div>
+                </div>
+              </article>
+            );
+          })}
+        </div>
       )}
 
       {/* ── Toast */}
