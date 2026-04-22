@@ -9,7 +9,7 @@ import {
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
-const MASTER_PROMPT_V4 = `const MASTER_PROMPT_V4 = `# 전문 정책 큐레이터 블로그 작성 지침 (수석 에디터 X 시각화 배치 최적화 v4.8)
+const MASTER_PROMPT_V4 = `# 전문 정책 큐레이터 블로그 작성 지침 (수석 에디터 X 시각화 배치 최적화 v4.8)
 당신은 네이버 홈판 상위 노출 전문 작가이자, 팩트에 엄격한 수석 에디터입니다.아래 규칙을 미친 듯이 준수하여 원고를 작성하세요.
 
 1. 🎯 제목 전략(SEO / GEO - 무조건 엄수):
@@ -198,17 +198,17 @@ export default function Dashboard() {
     if (fetchingRef.current.has(sourceId)) return;
 
     fetchingRef.current.add(sourceId);
-    if (force) showToast(`🔃 ${ sourceId } 데이터 수집 중…`);
+    if (force) showToast(`🔃 ${sourceId} 데이터 수집 중…`);
 
     try {
-      const res = await fetch(`/ api / data ? source = ${ encodeURIComponent(sourceId) }& t=${ Date.now() } `, { cache: 'no-store' });
+      const res = await fetch(`/ api / data ? source = ${encodeURIComponent(sourceId)}& t=${Date.now()} `, { cache: 'no-store' });
       const json = await res.json();
 
       if (json.success) {
         const items: FeedItem[] = json.data ?? [];
         const errMsg = items.length === 0 ? '데이터를 불러올 수 없습니다 (보안 차단 또는 공고 없음)' : null;
         setDataStore(prev => ({ ...prev, [sourceId]: { items, fetched: true, loading: false, error: errMsg } }));
-        if (force && items.length > 0) showToast(`✅ ${ sourceId } ${ items.length }건 수집!`);
+        if (force && items.length > 0) showToast(`✅ ${sourceId} ${items.length}건 수집!`);
       } else {
         setDataStore(prev => ({
           ...prev,
@@ -260,7 +260,7 @@ export default function Dashboard() {
       const targetKey = ['보조금24', '중기부/소진공', 'K-Startup', '경기/화성비즈'].find(k => item.category.includes(k) || (item.source && item.source.includes(k))) || '보조금24';
       const dynamicPoint = customPoints[targetKey];
 
-      promptText += `\n\n7. [출처별 특화 미션](위 요약 4번 항목 '놓치기 쉬운 꿀팁' 및 본문에 필수 반영): \n - ${ dynamicPoint } `;
+      promptText += `\n\n7. [출처별 특화 미션](위 요약 4번 항목 '놓치기 쉬운 꿀팁' 및 본문에 필수 반영): \n - ${dynamicPoint} `;
     }
 
     navigator.clipboard.writeText(promptText)
@@ -336,7 +336,7 @@ export default function Dashboard() {
             className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-2xl font-black text-base transition-all active:scale-95 disabled:opacity-50 shadow-lg"
           >
             <RefreshCw className={cn('w-5 h-5', isLoading && 'animate-spin')} />
-            {isLoading ? '수집 중…' : `${ activeTab } 재수집`}
+            {isLoading ? '수집 중…' : `${activeTab} 재수집`}
           </button>
         )}
       </div>
@@ -378,7 +378,7 @@ export default function Dashboard() {
         <input
           value={searchQuery}
           onChange={e => setSearchQuery(e.target.value)}
-          placeholder={`${ activeTab } 검색…`}
+          placeholder={`${activeTab} 검색…`}
           className="w-full pl-14 pr-5 py-4 rounded-3xl border-2 border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 text-base font-bold shadow-sm transition-all"
         />
       </div>
@@ -495,7 +495,7 @@ export default function Dashboard() {
                   <div>
                     <h4 className="font-black text-orange-600 dark:text-orange-400 mb-1">[🚀 신청방법]</h4>
                     <p className="text-gray-800 dark:text-gray-200 font-medium">
-                      {item.almaengi?.deadline && item.almaengi.deadline !== '공고확인' ? `${ item.almaengi.deadline } 까지 온 / 오프라인 신청` : '공식 사이트 참조'}
+                      {item.almaengi?.deadline && item.almaengi.deadline !== '공고확인' ? `${item.almaengi.deadline} 까지 온 / 오프라인 신청` : '공식 사이트 참조'}
                     </p>
                   </div>
 
