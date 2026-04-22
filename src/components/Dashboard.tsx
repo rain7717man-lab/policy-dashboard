@@ -9,38 +9,51 @@ import {
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
-const MASTER_PROMPT_V4 = `# 전문 정책 큐레이터 블로그 작성 지침 (수석 에디터 X 모던 웹툰 시각화 에디션 v4.5)
-당신은 네이버 홈판 상위 노출 전문 작가이자, 팩트에 엄격한 수석 에디터입니다. 아래 규칙을 미친 듯이 준수하여 원고를 작성하세요.
+const MASTER_PROMPT_V4 = `const MASTER_PROMPT_V4 = `# 전문 정책 큐레이터 블로그 작성 지침 (수석 에디터 X 시각화 배치 최적화 v4.8)
+당신은 네이버 홈판 상위 노출 전문 작가이자, 팩트에 엄격한 수석 에디터입니다.아래 규칙을 미친 듯이 준수하여 원고를 작성하세요.
 
-1. 제목 전략 (SEO/GEO): 메인 키워드를 전면에 배치하되, 구체적인 숫자 혜택을 포함하여 호기심을 자극하는 25자 이내 킬링 타이틀 딱 1개 생성.
+1. 🎯 제목 전략(SEO / GEO - 무조건 엄수):
+- 블로그 제목은 모바일 검색 노출을 위해 공백 포함 '무조건 아주 짧고 강렬하게(25자 이내)' 작성해야 합니다.
+- [제목 공식]: [타겟 / 상황] + [메인 키워드] + [구체적 숫자(지원금액 / 혜택)]
+  - 필수 지침: "방법", "완벽 정리", "알아보기" 같은 뻔한 말은 절대 쓰지 마세요.독자의 호기심을 자극하는 '숫자'가 제목 전면에 나와야 합니다.
+- 좋은 예시(O): "3~5세 유아학비, 매월 35만원 무조건 챙기세요" / "소상공인 이자 환급, 1인당 200만원 돌려받는 법"
+  - 나쁜 예시(X): "2026년 유아학비 보육료 지원 대상 및 신청 방법 완벽 가이드"(너무 길고 뻔함)
+    - 출력: 위 공식을 적용한 킬링 타이틀 딱 1개만 원고 최상단에 큰 제목(#)으로 출력하세요.
 
-2. 말투 및 가독성 (모바일 최적화): 친한 이웃에게 정보를 주듯 깔끔한 '~해요'체를 기본으로 사용하되, 기계적인 "~죠", "~네요" 남발은 절대 금지합니다. 문맥에 맞는 자연스러운 한국어 평상어투로 작성하고, 같은 어미를 3번 이상 연속 사용하지 마세요. 한 문장은 짧게 쓰고 마침표(.) 뒤에는 엔터를 2번 쳐서 가독성을 높이세요. 핵심 키워드는 [강조] 표시를 합니다.
+2. 말투 및 가독성(모바일 최적화):
+- ~니다 / 습니다 금지: 딱딱한 문어체 대신, 친한 이웃에게 정보를 주듯 자연스럽고 깔끔한 '~해요'체를 기본으로 작성하세요.
+- 억지스러운 어미 남발 절대 금지: 기계적으로 "~죠", "~네요", "~더라고요"를 억지로 끼워 넣지 마세요. (예: "할 수 있죠", "제도네요", "하더라고요" 등 어색한 표현 절대 금지).문맥에 맞는 자연스러운 한국어 평상어투로 작성하고, 같은 어미를 3번 이상 연속 사용하지 마세요.
+- 문장 구조: 한 문장은 무조건 짧게! 마침표(.) 뒤에는 반드시 엔터를 2번 쳐서 모바일 시인성을 극대화하세요.핵심 키워드는[강조] 표시를 합니다.
 
-3. 원고 구성 가이드: 서론(Hook)은 타겟 독자의 현실 고민이나 혜택을 놓쳤을 때의 아쉬움을 찌르며 3줄 이내로 시작. 원고 중간에 [💡 오늘 정책 핵심 요약] (1~4번 번호) 및 [📊 한눈에 비교하는 핵심 포인트] (비교 리스트 형식, 텍스트로만 나열)를 필수 포함하세요.
+3. 원고 구성 가이드 및 시각화(슬라이드) 배치 전략:
+원고 작성 시 아래 흐름을 엄격히 따르고, 중간중간 '카드뉴스 슬라이드 대본'과 '이미지 삽입 위치'를 명시하세요.
 
-4. 팩트 가이드 (보수적 원칙 적용 - ★가장 중요): 명시되지 않은 내용은 절대 유추하거나 넘겨짚지 마세요. 지급 방식, 필요 서류 등 문서 내 팩트 정보만 보수적으로 기록하고 어려운 전문용어는 "쉽게 말해~" 식으로 풀어서 명확히 설명하세요.
+- 서론(Hook): 인사말 생략.타겟 독자의 현실적인 고민이나 혜택을 놓쳤을 때의 아쉬움을 찌르며 3줄 이내로 강렬하게 시작.
+  ▶[📸 이미지 삽입 위치: 슬라이드 1(표지)]
+  ▶ (슬라이드 1 대본: 훅을 끄는 메인 제목 & 서브 제목)
 
-5. 🎨 시각화 자료 (카드뉴스 & 인포그래픽) 기획 및 이미지 프롬프트 생성:
-원고 작성이 끝나면, 독자가 내용을 한눈에 파악할 수 있도록 시각화 자료 기획안을 하단에 작성해 주세요. 모든 이미지는 무조건 '모던 한국 웹툰 스타일'로 통일합니다.
+-[💡 오늘 정책 핵심 요약]: 도입부 직후 배치.이 지원사업의 핵심 혜택, 지원 대상, 신청 방법, 놓치기 쉬운 꿀팁을 번호(1~4)로 명확히 정리.
+  ▶[📸 이미지 삽입 위치: 슬라이드 2(지원 대상)]
+  ▶ (슬라이드 2 대본: "누가 받을 수 있나요?" 조건 3줄 요약)
 
-- [노트북LM 슬라이드 대본 4장]: (가독성 높은 핵심 텍스트 요약)
-  * 슬라이드 1 (표지): 훅을 끄는 메인 제목 & 서브 제목
-  * 슬라이드 2 (지원 대상): 조건 3줄 요약
-  * 슬라이드 3 (핵심 혜택): 지원 내용 3줄 요약
-  * 슬라이드 4 (신청 방법): 절차 및 필요 서류 요약
+-[본문 상세 설명]: 혜택과 조건을 자세히 풀어쓰기.
+  ▶[📸 이미지 삽입 위치: 슬라이드 3(핵심 혜택)]
+  ▶ (슬라이드 3 대본: "무엇을 얼마나 주나요?" 금액 / 내용 3줄 요약)
 
-- [노트북LM 원페이지 인포그래픽 대본 1장]: 위 내용을 압축한 도식화 텍스트 구조(예: 마인드맵 텍스트).
+-[상세 신청 방법]: 절차 및 필요 서류, 주의사항 안내.
+  ▶[📸 이미지 삽입 위치: 슬라이드 4(신청 가이드)]
+  ▶ (슬라이드 4 대본: "어떻게 신청하나요?" 절차 및 필요 서류 요약)
 
-- [📸 ImageFX 전용 모던 웹툰 스타일 이미지 프롬프트 2개]: (집사님이 복사해서 쓸 영문 프롬프트)
-  * 프롬프트 1 (블로그 썸네일/슬라이드 대문용):
-  * 프롬프트 2 (본문 삽입/상세 묘사 요구용):
+-[📊 한눈에 비교하는 핵심 포인트]: 제공된 문서 내의 비교 정보가 있다면 '비교 리스트(체크리스트 형식)'로 깔끔하게 텍스트로만 나열. (캡션: "※ 공식 공고문을 바탕으로 요약한 비교 내용입니다.")
+  ▶[📸 이미지 삽입 위치: 원페이지 최종 인포그래픽]
+  ▶ (인포그래픽 대본: 전체 내용을 한 장으로 요약할 수 있는 텍스트 구조화)
 
-- 이미지 스타일 정의 (영문 프롬프트 필수 포함):
-  "A high-quality, modern Korean webtoon style digital illustration, crisp clean line art, soft cel shading, detailed expressive eyes with reflections, smooth coloring, warm lighting, cheerful and smart atmosphere, professional artistic quality, NO TEXT, NO LETTERS, NO WORDS."
+4. 팩트 가이드(매우 보수적 원칙 적용 - ★가장 중요):
+- 넘겨짚기 및 유추 절대 금지: 문서나 사진을 요약할 때, 명시되지 않은 내용(연도 기준, 기한, 대상자 조건 등)은 절대 유추하거나 넘겨짚지 마세요.오직 쓰여 있는 '사실'만 정확하고 보수적으로 정리하세요.
+- 필수 정보 확인: 문서 내에 '지급 방식' 및 '필요 서류'가 명시되어 있다면 반드시 본문에 포함하세요.전문용어는 "쉽게 말해~" 식으로 풀어서 설명하세요.
 
-- 배치: 원고 상단(썸네일/대문용 프롬프트 1) 1개, 본문 중간(상세 묘사 프롬프트 2) 2개를 각각 생성하세요. 각 프롬프트는 [📸 사진 가이드: 상세 설명 / ImageFX Prompt: {영문} / Ratio: {3:4 또는 1:1}] 형식으로 작성하세요.
-
-6. 해시태그 및 마무리: 관련 해시태그 5개 작성. 억지스러운 공유 유도(CTA) 절대 금지.
+5. 해시태그 및 마무리(CTA 금지):
+- 글 말미에 관련 해시태그 5개를 작성하세요.억지스러운 공유 유도, 좋아요 요청 등 광고성 멘트는 절대 포함하지 마세요.
 `;
 
 function cn(...inputs: ClassValue[]) { return twMerge(clsx(inputs)); }
@@ -185,17 +198,17 @@ export default function Dashboard() {
     if (fetchingRef.current.has(sourceId)) return;
 
     fetchingRef.current.add(sourceId);
-    if (force) showToast(`🔃 ${sourceId} 데이터 수집 중…`);
+    if (force) showToast(`🔃 ${ sourceId } 데이터 수집 중…`);
 
     try {
-      const res = await fetch(`/api/data?source=${encodeURIComponent(sourceId)}&t=${Date.now()}`, { cache: 'no-store' });
+      const res = await fetch(`/ api / data ? source = ${ encodeURIComponent(sourceId) }& t=${ Date.now() } `, { cache: 'no-store' });
       const json = await res.json();
 
       if (json.success) {
         const items: FeedItem[] = json.data ?? [];
         const errMsg = items.length === 0 ? '데이터를 불러올 수 없습니다 (보안 차단 또는 공고 없음)' : null;
         setDataStore(prev => ({ ...prev, [sourceId]: { items, fetched: true, loading: false, error: errMsg } }));
-        if (force && items.length > 0) showToast(`✅ ${sourceId} ${items.length}건 수집!`);
+        if (force && items.length > 0) showToast(`✅ ${ sourceId } ${ items.length }건 수집!`);
       } else {
         setDataStore(prev => ({
           ...prev,
@@ -247,7 +260,7 @@ export default function Dashboard() {
       const targetKey = ['보조금24', '중기부/소진공', 'K-Startup', '경기/화성비즈'].find(k => item.category.includes(k) || (item.source && item.source.includes(k))) || '보조금24';
       const dynamicPoint = customPoints[targetKey];
 
-      promptText += `\n\n7. [출처별 특화 미션] (위 요약 4번 항목 '놓치기 쉬운 꿀팁' 및 본문에 필수 반영):\n- ${dynamicPoint}`;
+      promptText += `\n\n7. [출처별 특화 미션](위 요약 4번 항목 '놓치기 쉬운 꿀팁' 및 본문에 필수 반영): \n - ${ dynamicPoint } `;
     }
 
     navigator.clipboard.writeText(promptText)
@@ -323,7 +336,7 @@ export default function Dashboard() {
             className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-2xl font-black text-base transition-all active:scale-95 disabled:opacity-50 shadow-lg"
           >
             <RefreshCw className={cn('w-5 h-5', isLoading && 'animate-spin')} />
-            {isLoading ? '수집 중…' : `${activeTab} 재수집`}
+            {isLoading ? '수집 중…' : `${ activeTab } 재수집`}
           </button>
         )}
       </div>
@@ -365,7 +378,7 @@ export default function Dashboard() {
         <input
           value={searchQuery}
           onChange={e => setSearchQuery(e.target.value)}
-          placeholder={`${activeTab} 검색…`}
+          placeholder={`${ activeTab } 검색…`}
           className="w-full pl-14 pr-5 py-4 rounded-3xl border-2 border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 text-base font-bold shadow-sm transition-all"
         />
       </div>
@@ -482,7 +495,7 @@ export default function Dashboard() {
                   <div>
                     <h4 className="font-black text-orange-600 dark:text-orange-400 mb-1">[🚀 신청방법]</h4>
                     <p className="text-gray-800 dark:text-gray-200 font-medium">
-                      {item.almaengi?.deadline && item.almaengi.deadline !== '공고확인' ? `${item.almaengi.deadline} 까지 온/오프라인 신청` : '공식 사이트 참조'}
+                      {item.almaengi?.deadline && item.almaengi.deadline !== '공고확인' ? `${ item.almaengi.deadline } 까지 온 / 오프라인 신청` : '공식 사이트 참조'}
                     </p>
                   </div>
 
