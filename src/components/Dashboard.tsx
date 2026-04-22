@@ -17,7 +17,8 @@ const MASTER_PROMPT_V4 = `# 전문 정책 큐레이터 블로그 작성 지침 (
 - 🎨 추천 썸네일 배경 이미지: 생성된 '제목'의 핵심 오브젝트나 상황을 가장 극적으로 묘사하는 이미지 프롬프트를 원고 최상단에 배치하세요. (텍스트는 절대 넣지 말 것)
 
 2. 말투 및 가독성 (모바일 최적화):
-- ~니다/습니다 금지: 문장의 80% 이상을 "~해요", "~죠", "~네요", "~더라고요" 등 부드러운 해요체로 작성하세요. 같은 어미를 3번 이상 연속 사용하지 마세요.
+- ~니다/습니다 금지: 딱딱한 문어체 대신, 친한 이웃에게 정보를 주듯 자연스럽고 깔끔한 '~해요'체를 기본으로 작성하세요.
+- 억지스러운 어미 남발 절대 금지: 기계적으로 "~죠", "~네요", "~더라고요"를 억지로 끼워 넣지 마세요. (예: "할 수 있죠", "제도네요", "하더라고요" 등 어색한 번역투/AI투 표현 절대 금지). 문맥에 맞는 가장 자연스러운 한국어 평상어투로 작성하고, 같은 어미를 3번 이상 연속 사용하지 마세요.
 - 문장 구조: 한 문장은 무조건 짧게! 마침표(.) 뒤에는 반드시 엔터를 2번 쳐서 모바일 시인성을 극대화하세요. 핵심 키워드는 [강조] 표시를 합니다.
 
 3. 원고 구성 가이드 (출처별 미션 처리 주의):
@@ -259,8 +260,13 @@ export default function Dashboard() {
 
   // ── 필터링 + 정렬 (메모이제이션)
   const filteredItems = useMemo(() => {
-    const EXCLUDE_KEYWORDS = ['어선', '귀어', '어업', '양식', '농촌', '농업'];
+    const EXCLUDE_MINISTRIES = ['해양수산부', '농림축산식품부', '농촌진흥청', '산림청'];
+    const EXCLUDE_KEYWORDS = ['어선', '귀어', '어업', '양식', '농기계', '농업'];
+    
     const isExcluded = (item: FeedItem) => {
+      const ministry = item.ministry || '';
+      if (EXCLUDE_MINISTRIES.some(kw => ministry.includes(kw))) return true;
+      
       const fullText = (item.title || '') + ' ' + (item.description || '');
       return EXCLUDE_KEYWORDS.some(kw => fullText.includes(kw));
     };
