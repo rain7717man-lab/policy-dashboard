@@ -201,7 +201,7 @@ export default function Dashboard() {
     if (force) showToast(`🔃 ${sourceId} 데이터 수집 중…`);
 
     try {
-      const res = await fetch(`/ api / data ? source = ${encodeURIComponent(sourceId)}& t=${Date.now()} `, { cache: 'no-store' });
+      const res = await fetch(`/api/data?source=${encodeURIComponent(sourceId)}&t=${Date.now()}`, { cache: 'no-store' });
       const json = await res.json();
 
       if (json.success) {
