@@ -87,7 +87,7 @@ export async function withRetry<T>(fn: () => Promise<T>, retries = 2): Promise<T
 // ─────────────────────────────────────────────────────────
 // 1. 정책브리핑 (korea.kr) — 보도자료 RSS
 // ─────────────────────────────────────────────────────────
-export async function scrapeKoreaKr(limit = 100): Promise<FeedItem[]> {
+export async function scrapeKoreaKr(limit = 200): Promise<FeedItem[]> {
   // 공식 보도자료 RSS 단일 URL 고정 (엔드포인트 추론 금지)
   const RSS_URL = 'https://www.korea.kr/rss/pressrelease.xml';
   console.log(`[정책브리핑] RSS 호출: ${RSS_URL}`);
@@ -123,7 +123,7 @@ export async function scrapeKoreaKr(limit = 100): Promise<FeedItem[]> {
 // ─────────────────────────────────────────────────────────
 // 2. K-Startup — RSS (최신순 정렬)
 // ─────────────────────────────────────────────────────────
-export async function scrapeKStartup(limit = 100): Promise<FeedItem[]> {
+export async function scrapeKStartup(limit = 200): Promise<FeedItem[]> {
   const url = 'https://www.k-startup.go.kr/web/contents/rss/bizpbanc-ongoing.do';
   try {
     console.log('[K-Startup] RSS 호출...');
@@ -159,7 +159,7 @@ export async function scrapeKStartup(limit = 100): Promise<FeedItem[]> {
 //    https://api.odcloud.kr/api/gov24/v1/serviceList
 //    응답 구조: { data: [...], totalCount, ... }
 // ─────────────────────────────────────────────────────────
-export async function scrapeGov24(limit = 100): Promise<FeedItem[]> {
+export async function scrapeGov24(limit = 200): Promise<FeedItem[]> {
   const url = 'https://api.odcloud.kr/api/gov24/v3/serviceList';
   console.log(`[보조금24] gov24 v3 API 호출... URL: ${url}`);
   try {
@@ -311,7 +311,7 @@ function mapMSSItem(item: any, isLocal: boolean): FeedItem {
   };
 }
 
-export async function scrapeMSS(limit = 100): Promise<FeedItem[]> {
+export async function scrapeMSS(limit = 200): Promise<FeedItem[]> {
   const raw  = await fetchMSSBiz(limit);
   const all  = raw.map(item => mapMSSItem(item, false));
   const result = all
@@ -330,7 +330,7 @@ function isGyeonggi(item: FeedItem | any): boolean {
   return /경기|화성/.test(txt);
 }
 
-export async function scrapeGyeonggi(limit = 100): Promise<FeedItem[]> {
+export async function scrapeGyeonggi(limit = 200): Promise<FeedItem[]> {
   try {
     // 중기부 API에서 경기/화성 키워드 포함 공고만 필터
     const raw = await fetchMSSBiz(200); // 더 많이 가져와서 필터

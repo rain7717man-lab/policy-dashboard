@@ -14,7 +14,7 @@ export const maxDuration = 60;
 export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const source = searchParams.get('source');
-    const limit = 100;
+    const limit = 200;
 
     console.log(`[API] Fetching source: ${source}, Target: ${limit}`);
 
