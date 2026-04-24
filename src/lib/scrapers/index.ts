@@ -21,7 +21,7 @@ const CHROME_HEADERS = {
   'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
   'Accept-Encoding': 'gzip, deflate, br',
   'Cache-Control': 'no-cache',
-  'Connection': 'keep-alive',
+  'Connection': 'close', // ECONNRESET 방지 위해 keep-alive 대신 close 사용
   'Upgrade-Insecure-Requests': '1',
   'Sec-Ch-Ua': '"Chromium";v="123", "Google Chrome";v="123", "Not-A.Brand";v="99"',
   'Sec-Ch-Ua-Mobile': '?0',
@@ -407,11 +407,11 @@ async function localGet(url: string, referer: string): Promise<string | null> {
 
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      if (attempt > 0) await sleep(1000);
+      if (attempt > 0) await sleep(1500); // 지연 시간 약간 증가
       const res = await axios.get(url, {
         headers,
         httpsAgent: http,
-        timeout: 20000,
+        timeout: 25000,
         responseType: 'text',
       });
       return res.data;
@@ -420,128 +420,101 @@ async function localGet(url: string, referer: string): Promise<string | null> {
         console.error(`[localGet] ❌ 최종 실패: ${url} (${e.message})`);
         return null;
       }
-      console.warn(`[localGet] 재시도 ${attempt + 1}/2: ${url}`);
+      console.warn(`[localGet] 재시도 ${attempt + 1}/2: ${url} - 사유: ${e.message}`);
     }
   }
   return null;
 }
 
-/** HTML 게시판 파싱 헬퍼 */
-function parseBoardHtml(html: string, baseUrl: string, source: string): FeedItem[] {
+/** 화성시청 3페이지 순회 스크래핑 */
+async function scrapeHwaseongLocal(limit: number): Promise<FeedItem[]> {
+  const allItems: FeedItem[] = [];
+  const BASE = 'https://www.hscity.go.kr';
+  
+  for (let page = 1; page <= 3; page++) {
+    const url = `${BASE}/www/user/bbs/BD_selectBbsList.do?q_bbsCode=1019&q_currPage=${page}`;
+    console.log(`[화성시청] HTML 수집 (${page}페이지): ${url}`);
+    
+    const html = await localGet(url, `${BASE}/www/index.do`);
+    if (!html) continue;
+
+    const $ = cheerio.load(html);
+    $('table.table_list tbody tr').each((_, el) => {
+      const $tds = $(el).find('td');
+      if ($tds.length < 3) return;
+
+      const titleA = $(el).find('td.subject a').first();
+      const title = titleA.text().trim();
+      if (!title) return;
+
+      const href = titleA.attr('href') || '';
+      const link = href.startsWith('http') ? href : `${BASE}${href}`;
+      const date = $(el).find('td.date').text().trim() || toDate(null);
+
+      allItems.push({
+        id: `hscity-${title.slice(0, 20)}-${date}-${page}`,
+        ministry: '화성시청',
+        category: '로컬(화성/경기)',
+        title,
+        link,
+        date: toDate(date),
+        description: '화성시청 공식 고시공고입니다. 자세한 내용은 원문을 확인하세요.',
+        source: '화성시청',
+        isLocal: true,
+        almaengi: extractAlmaengi(title, ''),
+      });
+    });
+    
+    if (page < 3) await sleep(1000);
+  }
+  return allItems;
+}
+
+/** 경기도 이지비즈(egbiz.or.kr) 스크래핑 */
+async function scrapeGyeonggiLocal(limit: number): Promise<FeedItem[]> {
+  const BASE = 'https://www.egbiz.or.kr';
+  const url = `${BASE}/sp/supportPrjCatList.do`;
+  console.log(`[경기도 이지비즈] 수집 시작: ${url}`);
+  
+  const html = await localGet(url, BASE);
+  if (!html) return [];
+
   const $ = cheerio.load(html);
   const items: FeedItem[] = [];
   
-  // 공통적인 테이블 행 찾기
-  $('table tbody tr').each((_, el) => {
-    const $tds = $(el).find('td');
-    if ($tds.length < 3) return;
+  // 이지비즈 아이템 리스트 추출
+  $('a[title="페이지 이동"]').each((_, el) => {
+    const id = $(el).attr('id') || '';
+    if (!id) return;
 
-    const titleA = $(el).find('a').first();
-    const title = titleA.text().trim();
+    const title = $(el).find('p').first().text().trim();
     if (!title) return;
 
-    const href = titleA.attr('href') || '';
-    const link = href.startsWith('http') ? href : `${baseUrl}${href}`;
+    const link = `${BASE}/sp/supportPrjDtl.do?bizCyclId=${id}`;
     
-    // 날짜 찾기 (보통 마지막이나 그 앞 td)
-    let date = '상시';
-    $tds.each((_, td) => {
-      const text = $(td).text().trim();
-      if (/\d{4}-\d{2}-\d{2}/.test(text)) date = text;
-    });
+    // 날짜 추출 (YYYY-MM-DD ~ YYYY-MM-DD 패턴)
+    const dateText = $(el).text();
+    const dateMatch = dateText.match(/\d{4}-\d{2}-\d{2}/);
+    const date = dateMatch ? dateMatch[0] : toDate(null);
 
     items.push({
-      id: `${source}-${title.slice(0, 20)}-${date}`,
-      ministry: source,
+      id: `egbiz-${id}`,
+      ministry: '경기도(이지비즈)',
       category: '로컬(화성/경기)',
       title,
       link,
       date: toDate(date),
-      description: `${source} 공식 고시공고입니다.`,
-      source,
+      description: '경기도 중소기업 지원정보(이지비즈) 공고입니다.',
+      source: '이지비즈',
       isLocal: true,
-      almaengi: extractAlmaengi(title, ''),
+      almaengi: extractAlmaengi(title, dateText),
     });
   });
+
   return items;
 }
 
-/** RSS 파싱 (정규식 Fallback 포함) */
-async function parseRssRobust(xml: string, source: string): Promise<FeedItem[]> {
-  try {
-    const feed = await parser.parseString(xml);
-    return (feed.items || []).map(item => ({
-      id: `${source}-${item.guid || item.link || Math.random()}`,
-      ministry: source,
-      category: '로컬(화성/경기)',
-      title: item.title || '',
-      link: item.link || '',
-      date: toDate(item.pubDate),
-      description: (item.contentSnippet || '').slice(0, 200),
-      source,
-      isLocal: true,
-      almaengi: extractAlmaengi(item.title || '', ''),
-    }));
-  } catch (e) {
-    console.warn(`[RSS] ⚠️ 파서 실패, 정규식 추출 시도: ${source}`);
-    const items: FeedItem[] = [];
-    const matches = xml.matchAll(/<item>([\s\S]*?)<\/item>/g);
-    for (const match of matches) {
-      const content = match[1];
-      const title = content.match(/<title>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/title>/)?.[1] || '';
-      const link = content.match(/<link>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/link>/)?.[1] || '';
-      const date = content.match(/<pubDate>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/pubDate>/)?.[1] || '';
-      if (title) {
-        items.push({
-          id: `${source}-${title.slice(0, 20)}`,
-          ministry: source,
-          category: '로컬(화성/경기)',
-          title, link, date: toDate(date),
-          description: '', source, isLocal: true,
-          almaengi: extractAlmaengi(title, ''),
-        });
-      }
-    }
-    return items;
-  }
-}
-
-async function scrapeHwaseongLocal(limit: number): Promise<FeedItem[]> {
-  const url = 'https://www.hscity.go.kr/www/user/bbs/BD_selectBbsList.do?q_bbsCode=1019';
-  const rss = 'https://www.hscity.go.kr/www/user/bbs/BD_selectBbsRss.do?q_bbsCode=1019';
-  
-  // 1. RSS 시도
-  const xml = await localGet(rss, 'https://www.hscity.go.kr/');
-  if (xml && xml.includes('<item')) {
-    const items = await parseRssRobust(xml, '화성시청');
-    if (items.length > 0) return items;
-  }
-
-  // 2. HTML Fallback
-  const html = await localGet(url, 'https://www.hscity.go.kr/');
-  if (html) return parseBoardHtml(html, 'https://www.hscity.go.kr', '화성시청');
-  
-  return [];
-}
-
-async function scrapeGyeonggiLocal(limit: number): Promise<FeedItem[]> {
-  const url = 'https://www.gg.go.kr/bbs/board.do?bsIdx=469&menuId=1547';
-  const rss = 'https://www.gg.go.kr/bbs/board.do?bsIdx=469&q_rss=Y';
-
-  // 1. RSS 시도
-  const xml = await localGet(rss, 'https://www.gg.go.kr/');
-  if (xml && xml.includes('<item')) {
-    const items = await parseRssRobust(xml, '경기도청');
-    if (items.length > 0) return items;
-  }
-
-  // 2. HTML Fallback
-  const html = await localGet(url, 'https://www.gg.go.kr/');
-  if (html) return parseBoardHtml(html, 'https://www.gg.go.kr', '경기도청');
-
-  return [];
-}
-
+/** 찐 로컬(화성/경기) 통합 및 키워드 필터링 */
 export async function scrapeLocal(limit = 200): Promise<FeedItem[]> {
   try {
     const [hwaseong, gyeonggi] = await Promise.all([
@@ -550,15 +523,20 @@ export async function scrapeLocal(limit = 200): Promise<FeedItem[]> {
     ]);
 
     const combined = [...hwaseong, ...gyeonggi];
-    const keywords = ['소상공인', '지원', '모집', '지역화폐', '청년', '창업', '혜택'];
+    // 제목 뿐만 아니라 description(이지비즈의 경우 텍스트 전체)까지 포함하여 필터링
+    const keywords = ['소상공인', '지원', '모집', '지역화폐', '청년', '창업', '혜택', '스타트업', '경영지원', '자금'];
     
     const filtered = combined.filter(item => {
-      const text = (item.title + item.description).toLowerCase();
+      const text = (item.title + ' ' + item.description).toLowerCase();
       return keywords.some(kw => text.includes(kw));
     });
 
-    console.log(`[로컬] 최종 ${filtered.length}건 선별`);
-    return filtered
+    console.log(`[로컬(화성/경기)] 최종 ${filtered.length}건 선별 (원본 ${combined.length}건)`);
+    
+    // 데이터가 아예 없을 때만 빈 배열 반환, 있으면 필터 결과 반환
+    const result = filtered.length > 0 ? filtered : combined.slice(0, 50); // 필터 결과 없으면 최신 50개라도 반환
+    
+    return result
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
       .slice(0, limit);
   } catch (e) {
