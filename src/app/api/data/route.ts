@@ -5,6 +5,7 @@ import {
     scrapeGov24, 
     scrapeMSS, 
     scrapeGyeonggi, 
+    scrapeLocal,
     withRetry 
 } from '@/lib/scrapers';
 
@@ -36,6 +37,9 @@ export async function GET(req: NextRequest) {
                 break;
             case '경기/화성비즈':
                 data = await withRetry(() => scrapeGyeonggi(limit));
+                break;
+            case '로컬(화성/경기)':
+                data = await withRetry(() => scrapeLocal(limit));
                 break;
             default:
                 return NextResponse.json({ success: false, message: 'Invalid source' }, { status: 400 });

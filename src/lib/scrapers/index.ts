@@ -1,6 +1,7 @@
 import axios from 'axios';
 import Parser from 'rss-parser';
 import https from 'https';
+import * as cheerio from 'cheerio';
 
 const parser = new Parser({ timeout: 10000 });
 const http   = new https.Agent({ rejectUnauthorized: false, keepAlive: true });
@@ -376,4 +377,117 @@ export async function scrapeGyeonggi(limit = 200): Promise<FeedItem[]> {
     console.error(`[경기/화성비즈] ❌ 전체 스크래핑 실패 (서버 뻗음 방지, 빈 배열 반환): ${error.message}`);
     return [];
   }
+}
+
+// ─────────────────────────────────────────────────────────
+// 6. 로컬(화성/경기) — 화성시청 & 경기도청 고시공고 직접 스크래핑
+// ─────────────────────────────────────────────────────────
+
+/** 화성시청 고시공고 스크래핑 */
+async function scrapeHwaseongCity(limit: number): Promise<FeedItem[]> {
+  const url = 'https://www.hscity.go.kr/www/user/bbs/BD_selectBbsList.do?q_bbsCode=1019';
+  console.log(`[화성시청] 스크래핑 호출: ${url}`);
+  try {
+    const res = await axiosRetryGet(url, {
+      headers: { ...CHROME_HEADERS, Referer: 'https://www.hscity.go.kr/' },
+      httpsAgent: http, timeout: 30000,
+    });
+    const $ = cheerio.load(res.data);
+    const items: FeedItem[] = [];
+
+    $('table tbody tr').each((_, el) => {
+      const $tds = $(el).find('td');
+      if ($tds.length < 4) return;
+
+      const title = $tds.eq(1).text().trim();
+      const relativeLink = $tds.eq(1).find('a').attr('href') || '';
+      const link = relativeLink.startsWith('http') ? relativeLink : `https://www.hscity.go.kr${relativeLink}`;
+      const ministry = $tds.eq(2).text().trim() || '화성시청';
+      const date = toDate($tds.eq(3).text().trim());
+
+      items.push({
+        id: `hscity-${date}-${title.slice(0, 20)}`,
+        ministry,
+        category: '로컬(화성/경기)',
+        title,
+        link,
+        date,
+        description: '화성시청 공식 고시공고입니다. 자세한 내용은 원문을 확인하세요.',
+        source: '화성시청',
+        isLocal: true,
+        almaengi: extractAlmaengi(title, ''),
+      });
+    });
+
+    return items;
+  } catch (e: any) {
+    console.error(`[화성시청] ❌ ${e.message}`);
+    return [];
+  }
+}
+
+/** 경기도청 고시공고 스크래핑 */
+async function scrapeGyeonggiCity(limit: number): Promise<FeedItem[]> {
+  const url = 'https://www.gg.go.kr/bbs/board.do?bsIdx=469&menuId=1547';
+  console.log(`[경기도청] 스크래핑 호출: ${url}`);
+  try {
+    const res = await axiosRetryGet(url, {
+      headers: { ...CHROME_HEADERS, Referer: 'https://www.gg.go.kr/' },
+      httpsAgent: http, timeout: 30000,
+    });
+    const $ = cheerio.load(res.data);
+    const items: FeedItem[] = [];
+
+    $('table.table-list tbody tr').each((_, el) => {
+      const $tds = $(el).find('td');
+      if ($tds.length < 5) return;
+
+      const title = $tds.eq(1).text().trim();
+      const relativeLink = $tds.eq(1).find('a').attr('href') || '';
+      const link = relativeLink.startsWith('http') ? relativeLink : `https://www.gg.go.kr${relativeLink}`;
+      const ministry = $tds.eq(3).text().trim() || '경기도청';
+      const date = toDate($tds.eq(4).text().trim());
+
+      items.push({
+        id: `gg-city-${date}-${title.slice(0, 20)}`,
+        ministry,
+        category: '로컬(화성/경기)',
+        title,
+        link,
+        date,
+        description: '경기도청 공식 고시공고입니다. 자세한 내용은 원문을 확인하세요.',
+        source: '경기도청',
+        isLocal: true,
+        almaengi: extractAlmaengi(title, ''),
+      });
+    });
+
+    return items;
+  } catch (e: any) {
+    console.error(`[경기도청] ❌ ${e.message}`);
+    return [];
+  }
+}
+
+/** 찐 로컬(화성/경기) 통합 및 키워드 필터링 */
+export async function scrapeLocal(limit = 200): Promise<FeedItem[]> {
+  const [hwaseong, gyeonggi] = await Promise.all([
+    scrapeHwaseongCity(limit),
+    scrapeGyeonggiCity(limit),
+  ]);
+
+  const combined = [...hwaseong, ...gyeonggi];
+  
+  // 키워드 필터링: 소상공인, 지원, 모집, 지역화폐, 청년, 창업
+  const keywords = ['소상공인', '지원', '모집', '지역화폐', '청년', '창업'];
+  const filtered = combined.filter(item => {
+    const text = (item.title + item.description).toLowerCase();
+    return keywords.some(kw => text.includes(kw));
+  });
+
+  console.log(`[로컬(화성/경기)] 전체 ${combined.length}건 중 키워드 필터링 후 ${filtered.length}건 선별`);
+
+  return filtered
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .slice(0, limit);
 }

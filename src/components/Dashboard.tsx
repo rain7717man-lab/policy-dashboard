@@ -64,7 +64,7 @@ type FeedItem = {
 type SourceState = { items: FeedItem[]; loading: boolean; fetched: boolean; error: string | null };
 type DataStore = Record<string, SourceState>;
 
-const SOURCE_IDS = ['정책브리핑', 'K-Startup', '보조금24', '중기부/소진공', '경기/화성비즈'];
+const SOURCE_IDS = ['정책브리핑', 'K-Startup', '보조금24', '중기부/소진공', '경기/화성비즈', '로컬(화성/경기)'];
 
 const TABS = [
   { id: '알맹이', label: '✨ 상세/신청(알맹이)', icon: Sparkles, color: 'text-indigo-600' },
@@ -73,6 +73,7 @@ const TABS = [
   { id: '보조금24', label: '🛡️ 보조금24', icon: ShieldCheck, color: 'text-emerald-600' },
   { id: '중기부/소진공', label: '🏢 중기부/소진공', icon: Building2, color: 'text-purple-600' },
   { id: '경기/화성비즈', label: '🍎 경기/화성비즈', icon: Apple, color: 'text-red-600' },
+  { id: '로컬(화성/경기)', label: '📍 로컬(화성/경기)', icon: Landmark, color: 'text-cyan-600' },
 ];
 
 const mkInitial = (): DataStore =>
@@ -232,7 +233,8 @@ export default function Dashboard() {
         fetchSource('K-Startup'),
         fetchSource('보조금24'),
         fetchSource('중기부/소진공'),
-        fetchSource('경기/화성비즈')
+        fetchSource('경기/화성비즈'),
+        fetchSource('로컬(화성/경기)')
       ]);
     };
     fetchAll();
@@ -251,10 +253,11 @@ export default function Dashboard() {
         '보조금24': "지원 자격 요건을 일반인이 알기 쉽게 풀어서 설명하고, 어디서(어느 사이트/앱) 신청하는지 구체적인 경로를 강조해 줘.",
         '중기부/소진공': "바쁜 1인 기업 대표님들을 위해 지원 규모(지원 금액)와 필수 제출 서류 목록을 깔끔한 리스트로 한 번 더 요약해 줘.",
         'K-Startup': "자금 지원 외에 공간 제공이나 교육 등 부가 혜택이 있다면 돋보이게 쓰고, 서류 심사 시 가점(우대) 요건을 '합격 꿀팁'처럼 강조해 줘.",
-        '경기/화성비즈': "지역 특화 사업이므로 '거주지 요건'이나 '사업장 소재지 기준(화성/경기)'을 글 상단에 눈에 띄게 배치하고, 오프라인 접수처를 명확히 적어줘."
+        '경기/화성비즈': "지역 특화 사업이므로 '거주지 요건'이나 '사업장 소재지 기준(화성/경기)'을 글 상단에 눈에 띄게 배치하고, 오프라인 접수처를 명확히 적어줘.",
+        '로컬(화성/경기)': "시청/도청의 직접 공고이므로 '화성시민/경기도민' 대상임을 명확히 하고, 해당 지자체 거주자에게만 주어지는 특별한 혜택이나 가점 사항을 최우선적으로 강조해 줘."
       };
 
-      const targetKey = ['보조금24', '중기부/소진공', 'K-Startup', '경기/화성비즈'].find(k => item.category.includes(k) || (item.source && item.source.includes(k))) || '보조금24';
+      const targetKey = ['보조금24', '중기부/소진공', 'K-Startup', '경기/화성비즈', '로컬(화성/경기)'].find(k => item.category.includes(k) || (item.source && item.source.includes(k))) || '보조금24';
       const dynamicPoint = customPoints[targetKey];
 
       promptText += `\n\n7. [출처별 특화 미션](위 요약 4번 항목 '놓치기 쉬운 꿀팁' 및 본문에 필수 반영): \n - ${dynamicPoint} `;
