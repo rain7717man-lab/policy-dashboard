@@ -16,14 +16,14 @@ const API_KEY = process.env.DATA_GO_KR_API_KEY
 // 공통 브라우저 위장 헤더 (WAF 우회)
 // ─────────────────────────────────────────────────────────
 const CHROME_HEADERS = {
-  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
   'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
   'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
   'Accept-Encoding': 'gzip, deflate, br',
-  'Cache-Control': 'max-age=0',
+  'Cache-Control': 'no-cache',
   'Connection': 'keep-alive',
   'Upgrade-Insecure-Requests': '1',
-  'Sec-Ch-Ua': '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
+  'Sec-Ch-Ua': '"Chromium";v="123", "Google Chrome";v="123", "Not-A.Brand";v="99"',
   'Sec-Ch-Ua-Mobile': '?0',
   'Sec-Ch-Ua-Platform': '"Windows"',
   'Sec-Fetch-Dest': 'document',
@@ -392,157 +392,177 @@ export async function scrapeGyeonggi(limit = 200): Promise<FeedItem[]> {
 }
 
 // ─────────────────────────────────────────────────────────
-// 6. 로컬(화성/경기) — 화성시청 & 경기도청 고시공고 직접 스크래핑
+// 6. 로컬(화성/경기) — 화성시청 & 경기도청 고시공고 직접 수집
 // ─────────────────────────────────────────────────────────
 
-/** 화성시청 고시공고 스크래핑 */
-async function scrapeHwaseongCity(limit: number): Promise<FeedItem[]> {
-  const url = 'https://www.hscity.go.kr/www/user/bbs/BD_selectBbsList.do?q_bbsCode=1019';
-  const rssUrl = 'https://www.hscity.go.kr/www/user/bbs/BD_selectBbsRss.do?q_bbsCode=1019';
-  console.log(`[화성시청] 스크래핑 호출: ${url}`);
-  try {
-    await randomDelay();
-    const res = await axiosRetryGet(url, {
-      headers: { ...CHROME_HEADERS, Referer: 'https://www.hscity.go.kr/www/index.do' },
-      httpsAgent: http, timeout: 30000,
-    });
-    const $ = cheerio.load(res.data);
-    const items: FeedItem[] = [];
+/**
+ * ECONNRESET/403 방어용 강화 GET
+ */
+async function localGet(url: string, referer: string): Promise<string | null> {
+  const headers = {
+    ...CHROME_HEADERS,
+    'Referer': referer,
+    'Sec-Fetch-Site': 'same-origin',
+  };
 
-    const rows = $('table tbody tr');
-    if (rows.length === 0) {
-      console.warn('[화성시청] 스크래핑 결과 0건 - RSS 폴백 시도');
-      return await scrapeRSSFallback(rssUrl, '화성시청', '화성시청');
-    }
-
-    rows.each((_, el) => {
-      const $tds = $(el).find('td');
-      if ($tds.length < 4) return;
-
-      const title = $tds.eq(1).text().trim();
-      const relativeLink = $tds.eq(1).find('a').attr('href') || '';
-      const link = relativeLink.startsWith('http') ? relativeLink : `https://www.hscity.go.kr${relativeLink}`;
-      const ministry = $tds.eq(2).text().trim() || '화성시청';
-      const date = toDate($tds.eq(3).text().trim());
-
-      items.push({
-        id: `hscity-${date}-${title.slice(0, 20)}`,
-        ministry,
-        category: '로컬(화성/경기)',
-        title,
-        link,
-        date,
-        description: '화성시청 공식 고시공고입니다. 자세한 내용은 원문을 확인하세요.',
-        source: '화성시청',
-        isLocal: true,
-        almaengi: extractAlmaengi(title, ''),
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      if (attempt > 0) await sleep(1000);
+      const res = await axios.get(url, {
+        headers,
+        httpsAgent: http,
+        timeout: 20000,
+        responseType: 'text',
       });
-    });
-
-    return items;
-  } catch (e: any) {
-    console.error(`[화성시청] ❌ ${e.message} - RSS 폴백 시도`);
-    return await scrapeRSSFallback(rssUrl, '화성시청', '화성시청');
+      return res.data;
+    } catch (e: any) {
+      if (attempt === 2) {
+        console.error(`[localGet] ❌ 최종 실패: ${url} (${e.message})`);
+        return null;
+      }
+      console.warn(`[localGet] 재시도 ${attempt + 1}/2: ${url}`);
+    }
   }
+  return null;
 }
 
-/** 경기도청 고시공고 스크래핑 */
-async function scrapeGyeonggiCity(limit: number): Promise<FeedItem[]> {
-  const url = 'https://www.gg.go.kr/bbs/board.do?bsIdx=469&menuId=1547';
-  const rssUrl = 'https://www.gg.go.kr/bbs/board.do?bsIdx=469&q_rss=Y';
-  console.log(`[경기도청] 스크래핑 호출: ${url}`);
-  try {
-    await randomDelay();
-    const res = await axiosRetryGet(url, {
-      headers: { ...CHROME_HEADERS, Referer: 'https://www.gg.go.kr/index.do' },
-      httpsAgent: http, timeout: 30000,
-    });
-    const $ = cheerio.load(res.data);
-    const items: FeedItem[] = [];
+/** HTML 게시판 파싱 헬퍼 */
+function parseBoardHtml(html: string, baseUrl: string, source: string): FeedItem[] {
+  const $ = cheerio.load(html);
+  const items: FeedItem[] = [];
+  
+  // 공통적인 테이블 행 찾기
+  $('table tbody tr').each((_, el) => {
+    const $tds = $(el).find('td');
+    if ($tds.length < 3) return;
 
-    const rows = $('table.table-list tbody tr');
-    if (rows.length === 0) {
-      console.warn('[경기도청] 스크래핑 결과 0건 - RSS 폴백 시도');
-      return await scrapeRSSFallback(rssUrl, '경기도청', '경기도청');
-    }
+    const titleA = $(el).find('a').first();
+    const title = titleA.text().trim();
+    if (!title) return;
 
-    rows.each((_, el) => {
-      const $tds = $(el).find('td');
-      if ($tds.length < 5) return;
-
-      const title = $tds.eq(1).text().trim();
-      const relativeLink = $tds.eq(1).find('a').attr('href') || '';
-      const link = relativeLink.startsWith('http') ? relativeLink : `https://www.gg.go.kr${relativeLink}`;
-      const ministry = $tds.eq(3).text().trim() || '경기도청';
-      const date = toDate($tds.eq(4).text().trim());
-
-      items.push({
-        id: `gg-city-${date}-${title.slice(0, 20)}`,
-        ministry,
-        category: '로컬(화성/경기)',
-        title,
-        link,
-        date,
-        description: '경기도청 공식 고시공고입니다. 자세한 내용은 원문을 확인하세요.',
-        source: '경기도청',
-        isLocal: true,
-        almaengi: extractAlmaengi(title, ''),
-      });
+    const href = titleA.attr('href') || '';
+    const link = href.startsWith('http') ? href : `${baseUrl}${href}`;
+    
+    // 날짜 찾기 (보통 마지막이나 그 앞 td)
+    let date = '상시';
+    $tds.each((_, td) => {
+      const text = $(td).text().trim();
+      if (/\d{4}-\d{2}-\d{2}/.test(text)) date = text;
     });
 
-    return items;
-  } catch (e: any) {
-    console.error(`[경기도청] ❌ ${e.message} - RSS 폴백 시도`);
-    return await scrapeRSSFallback(rssUrl, '경기도청', '경기도청');
-  }
+    items.push({
+      id: `${source}-${title.slice(0, 20)}-${date}`,
+      ministry: source,
+      category: '로컬(화성/경기)',
+      title,
+      link,
+      date: toDate(date),
+      description: `${source} 공식 고시공고입니다.`,
+      source,
+      isLocal: true,
+      almaengi: extractAlmaengi(title, ''),
+    });
+  });
+  return items;
 }
 
-/** RSS 폴백 처리 헬퍼 */
-async function scrapeRSSFallback(url: string, ministry: string, source: string): Promise<FeedItem[]> {
+/** RSS 파싱 (정규식 Fallback 포함) */
+async function parseRssRobust(xml: string, source: string): Promise<FeedItem[]> {
   try {
-    await randomDelay();
-    const res = await axiosRetryGet(url, {
-      headers: { ...CHROME_HEADERS, Accept: 'application/rss+xml, application/xml, text/xml' },
-      httpsAgent: http, timeout: 15000,
-    });
-    const feed = await parser.parseString(res.data);
+    const feed = await parser.parseString(xml);
     return (feed.items || []).map(item => ({
       id: `${source}-${item.guid || item.link || Math.random()}`,
-      ministry: item.author || ministry,
+      ministry: source,
       category: '로컬(화성/경기)',
       title: item.title || '',
       link: item.link || '',
       date: toDate(item.pubDate),
-      description: (item.contentSnippet || '상세 내용은 원문을 확인해 주세요.').slice(0, 200),
+      description: (item.contentSnippet || '').slice(0, 200),
       source,
       isLocal: true,
-      almaengi: extractAlmaengi(item.title || '', item.contentSnippet || ''),
+      almaengi: extractAlmaengi(item.title || '', ''),
     }));
-  } catch (e: any) {
-    console.error(`[RSS-Fallback] ❌ ${source} 실패: ${e.message}`);
-    return [];
+  } catch (e) {
+    console.warn(`[RSS] ⚠️ 파서 실패, 정규식 추출 시도: ${source}`);
+    const items: FeedItem[] = [];
+    const matches = xml.matchAll(/<item>([\s\S]*?)<\/item>/g);
+    for (const match of matches) {
+      const content = match[1];
+      const title = content.match(/<title>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/title>/)?.[1] || '';
+      const link = content.match(/<link>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/link>/)?.[1] || '';
+      const date = content.match(/<pubDate>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/pubDate>/)?.[1] || '';
+      if (title) {
+        items.push({
+          id: `${source}-${title.slice(0, 20)}`,
+          ministry: source,
+          category: '로컬(화성/경기)',
+          title, link, date: toDate(date),
+          description: '', source, isLocal: true,
+          almaengi: extractAlmaengi(title, ''),
+        });
+      }
+    }
+    return items;
   }
 }
 
-/** 찐 로컬(화성/경기) 통합 및 키워드 필터링 */
-export async function scrapeLocal(limit = 200): Promise<FeedItem[]> {
-  const [hwaseong, gyeonggi] = await Promise.all([
-    scrapeHwaseongCity(limit),
-    scrapeGyeonggiCity(limit),
-  ]);
-
-  const combined = [...hwaseong, ...gyeonggi];
+async function scrapeHwaseong(limit: number): Promise<FeedItem[]> {
+  const url = 'https://www.hscity.go.kr/www/user/bbs/BD_selectBbsList.do?q_bbsCode=1019';
+  const rss = 'https://www.hscity.go.kr/www/user/bbs/BD_selectBbsRss.do?q_bbsCode=1019';
   
-  // 키워드 필터링: 소상공인, 지원, 모집, 지역화폐, 청년, 창업
-  const keywords = ['소상공인', '지원', '모집', '지역화폐', '청년', '창업'];
-  const filtered = combined.filter(item => {
-    const text = (item.title + item.description).toLowerCase();
-    return keywords.some(kw => text.includes(kw));
-  });
+  // 1. RSS 시도
+  const xml = await localGet(rss, 'https://www.hscity.go.kr/');
+  if (xml && xml.includes('<item')) {
+    const items = await parseRssRobust(xml, '화성시청');
+    if (items.length > 0) return items;
+  }
 
-  console.log(`[로컬(화성/경기)] 전체 ${combined.length}건 중 키워드 필터링 후 ${filtered.length}건 선별`);
+  // 2. HTML Fallback
+  const html = await localGet(url, 'https://www.hscity.go.kr/');
+  if (html) return parseBoardHtml(html, 'https://www.hscity.go.kr', '화성시청');
+  
+  return [];
+}
 
-  return filtered
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    .slice(0, limit);
+async function scrapeGyeonggi(limit: number): Promise<FeedItem[]> {
+  const url = 'https://www.gg.go.kr/bbs/board.do?bsIdx=469&menuId=1547';
+  const rss = 'https://www.gg.go.kr/bbs/board.do?bsIdx=469&q_rss=Y';
+
+  // 1. RSS 시도
+  const xml = await localGet(rss, 'https://www.gg.go.kr/');
+  if (xml && xml.includes('<item')) {
+    const items = await parseRssRobust(xml, '경기도청');
+    if (items.length > 0) return items;
+  }
+
+  // 2. HTML Fallback
+  const html = await localGet(url, 'https://www.gg.go.kr/');
+  if (html) return parseBoardHtml(html, 'https://www.gg.go.kr', '경기도청');
+
+  return [];
+}
+
+export async function scrapeLocal(limit = 200): Promise<FeedItem[]> {
+  try {
+    const [hwaseong, gyeonggi] = await Promise.all([
+      scrapeHwaseong(limit),
+      scrapeGyeonggi(limit),
+    ]);
+
+    const combined = [...hwaseong, ...gyeonggi];
+    const keywords = ['소상공인', '지원', '모집', '지역화폐', '청년', '창업', '혜택'];
+    
+    const filtered = combined.filter(item => {
+      const text = (item.title + item.description).toLowerCase();
+      return keywords.some(kw => text.includes(kw));
+    });
+
+    console.log(`[로컬] 최종 ${filtered.length}건 선별`);
+    return filtered
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, limit);
+  } catch (e) {
+    console.error('[로컬] 치명적 에러:', e);
+    return [];
+  }
 }
