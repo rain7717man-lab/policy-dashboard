@@ -426,7 +426,7 @@ async function localGet(url: string, referer: string): Promise<string | null> {
   return null;
 }
 
-/** 화성시청 3페이지 순회 스크래핑 */
+/** 화성시청 1~3페이지 수집 (Detail Link: q_bbscttSn) */
 async function scrapeHwaseongLocal(limit: number): Promise<FeedItem[]> {
   const allItems: FeedItem[] = [];
   const BASE = 'https://www.hscity.go.kr';
@@ -445,73 +445,90 @@ async function scrapeHwaseongLocal(limit: number): Promise<FeedItem[]> {
 
       const titleA = $(el).find('td.subject a').first();
       const title = titleA.text().trim();
-      if (!title) return;
-
       const href = titleA.attr('href') || '';
-      const link = href.startsWith('http') ? href : `${BASE}${href}`;
+      
+      // ID 추출 (q_bbscttSn)
+      const snMatch = href.match(/q_bbscttSn=(\d+)/);
+      const sn = snMatch ? snMatch[1] : '';
+      if (!title || !sn) return;
+
+      // 사용자 요청 형식: &q_bbscttSn=[게시물번호]
+      const link = `${BASE}/www/user/bbs/BD_selectBbs.do?q_bbsCode=1019&q_bbscttSn=${sn}`;
       const date = $(el).find('td.date').text().trim() || toDate(null);
 
       allItems.push({
-        id: `hscity-${title.slice(0, 20)}-${date}-${page}`,
+        id: `hscity-${sn}`,
         ministry: '화성시청',
         category: '로컬(화성/경기)',
         title,
         link,
         date: toDate(date),
-        description: '화성시청 공식 고시공고입니다. 자세한 내용은 원문을 확인하세요.',
+        description: '화성시청 공식 고시공고입니다.',
         source: '화성시청',
         isLocal: true,
         almaengi: extractAlmaengi(title, ''),
       });
     });
     
-    if (page < 3) await sleep(1000);
+    await sleep(800);
   }
   return allItems;
 }
 
-/** 경기도 이지비즈(egbiz.or.kr) 스크래핑 */
+/** 경기도청 1~3페이지 수집 (Detail Link: bcIdx/[bIdx]) */
 async function scrapeGyeonggiLocal(limit: number): Promise<FeedItem[]> {
-  const BASE = 'https://www.egbiz.or.kr';
-  const url = `${BASE}/sp/supportPrjCatList.do`;
-  console.log(`[경기도 이지비즈] 수집 시작: ${url}`);
+  const allItems: FeedItem[] = [];
+  const BASE = 'https://www.gg.go.kr';
   
-  const html = await localGet(url, BASE);
-  if (!html) return [];
-
-  const $ = cheerio.load(html);
-  const items: FeedItem[] = [];
-  
-  // 이지비즈 아이템 리스트 추출
-  $('a[title="페이지 이동"]').each((_, el) => {
-    const id = $(el).attr('id') || '';
-    if (!id) return;
-
-    const title = $(el).find('p').first().text().trim();
-    if (!title) return;
-
-    const link = `${BASE}/sp/supportPrjDtl.do?bizCyclId=${id}`;
+  for (let page = 1; page <= 3; page++) {
+    const url = `${BASE}/bbs/board.do?bsIdx=469&menuId=1547&pIndex=${page}`;
+    console.log(`[경기도청] HTML 수집 (${page}페이지): ${url}`);
     
-    // 날짜 추출 (YYYY-MM-DD ~ YYYY-MM-DD 패턴)
-    const dateText = $(el).text();
-    const dateMatch = dateText.match(/\d{4}-\d{2}-\d{2}/);
-    const date = dateMatch ? dateMatch[0] : toDate(null);
+    const html = await localGet(url, `${BASE}/index.do`);
+    if (!html) continue;
 
-    items.push({
-      id: `egbiz-${id}`,
-      ministry: '경기도(이지비즈)',
-      category: '로컬(화성/경기)',
-      title,
-      link,
-      date: toDate(date),
-      description: '경기도 중소기업 지원정보(이지비즈) 공고입니다.',
-      source: '이지비즈',
-      isLocal: true,
-      almaengi: extractAlmaengi(title, dateText),
+    const $ = cheerio.load(html);
+    // 경기도청 게시판은 보통 .table-list 또는 table tbody tr
+    $('table.table-list tbody tr, table tbody tr').each((_, el) => {
+      const $tds = $(el).find('td');
+      if ($tds.length < 3) return;
+
+      const titleA = $(el).find('a').first();
+      const title = titleA.text().trim();
+      const href = titleA.attr('href') || '';
+      
+      // bIdx 또는 bcIdx 추출 (사용자가 bcIdx를 언급했으므로 bIdx를 bcIdx 자리에 사용하거나 둘 다 확인)
+      const idMatch = href.match(/[bc]Idx=(\d+)/); 
+      const id = idMatch ? idMatch[1] : '';
+      if (!title || !id) return;
+
+      // 사용자 요청 형식: bcIdx=[게시물번호]&mode=view
+      // 실제 작동하는 boardView.do 대신 사용자가 명시한 board.do 형식을 우선 생성 (작동 확인 필요시 boardView로 폴백 고려)
+      const link = `${BASE}/bbs/board.do?bsIdx=469&menuId=1547&bcIdx=${id}&mode=view`;
+      
+      let date = '상시';
+      $tds.each((_, td) => {
+        const text = $(td).text().trim();
+        if (/\d{4}-\d{2}-\d{2}/.test(text)) date = text;
+      });
+
+      allItems.push({
+        id: `gg-${id}`,
+        ministry: '경기도청',
+        category: '로컬(화성/경기)',
+        title,
+        link,
+        date: toDate(date),
+        description: '경기도청 공식 고시공고입니다.',
+        source: '경기도청',
+        isLocal: true,
+        almaengi: extractAlmaengi(title, ''),
+      });
     });
-  });
-
-  return items;
+    
+    await sleep(1000);
+  }
+  return allItems;
 }
 
 /** 찐 로컬(화성/경기) 통합 및 키워드 필터링 */
@@ -523,8 +540,8 @@ export async function scrapeLocal(limit = 200): Promise<FeedItem[]> {
     ]);
 
     const combined = [...hwaseong, ...gyeonggi];
-    // 제목 뿐만 아니라 description(이지비즈의 경우 텍스트 전체)까지 포함하여 필터링
-    const keywords = ['소상공인', '지원', '모집', '지역화폐', '청년', '창업', '혜택', '스타트업', '경영지원', '자금'];
+    // 키워드 필터링 (지역 공고는 소중하므로 키워드 확장 및 덜 빡빡하게)
+    const keywords = ['소상공인', '지원', '모집', '지역화폐', '청년', '창업', '혜택', '스타트업', '기업', '산업', '공고'];
     
     const filtered = combined.filter(item => {
       const text = (item.title + ' ' + item.description).toLowerCase();
