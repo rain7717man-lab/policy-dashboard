@@ -506,7 +506,7 @@ async function parseRssRobust(xml: string, source: string): Promise<FeedItem[]> 
   }
 }
 
-async function scrapeHwaseong(limit: number): Promise<FeedItem[]> {
+async function scrapeHwaseongLocal(limit: number): Promise<FeedItem[]> {
   const url = 'https://www.hscity.go.kr/www/user/bbs/BD_selectBbsList.do?q_bbsCode=1019';
   const rss = 'https://www.hscity.go.kr/www/user/bbs/BD_selectBbsRss.do?q_bbsCode=1019';
   
@@ -524,7 +524,7 @@ async function scrapeHwaseong(limit: number): Promise<FeedItem[]> {
   return [];
 }
 
-async function scrapeGyeonggi(limit: number): Promise<FeedItem[]> {
+async function scrapeGyeonggiLocal(limit: number): Promise<FeedItem[]> {
   const url = 'https://www.gg.go.kr/bbs/board.do?bsIdx=469&menuId=1547';
   const rss = 'https://www.gg.go.kr/bbs/board.do?bsIdx=469&q_rss=Y';
 
@@ -545,8 +545,8 @@ async function scrapeGyeonggi(limit: number): Promise<FeedItem[]> {
 export async function scrapeLocal(limit = 200): Promise<FeedItem[]> {
   try {
     const [hwaseong, gyeonggi] = await Promise.all([
-      scrapeHwaseong(limit),
-      scrapeGyeonggi(limit),
+      scrapeHwaseongLocal(limit),
+      scrapeGyeonggiLocal(limit),
     ]);
 
     const combined = [...hwaseong, ...gyeonggi];
